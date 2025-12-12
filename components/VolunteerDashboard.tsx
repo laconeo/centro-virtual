@@ -249,40 +249,7 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
             </button>
           </div>
 
-          {longestWaiting && (
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6 mb-6 shadow-md relative overflow-hidden">
-              <div className="absolute top-0 right-0 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">
-                Siguiente Prioridad
-              </div>
-              <div className="flex flex-col md:flex-row justify-between items-center gap-6 relative z-10">
-                <div className="flex items-start gap-4">
-                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm text-blue-600">
-                    {longestWaiting.type === 'video' ? <Video className="w-8 h-8" /> : <MessageSquare className="w-8 h-8" />}
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-800">{longestWaiting.nombre} {longestWaiting.apellido}</h2>
-                    <div className="flex items-center gap-2 text-sm text-[var(--color-fs-text-light)] mt-1">
-                      <span className="font-medium bg-white px-2 py-0.5 rounded border border-gray-200">{longestWaiting.pais}</span>
-                      <span>•</span>
-                      <span className="font-medium">{longestWaiting.tema}</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-red-600 font-bold mt-2 animate-pulse">
-                      <Clock className="w-4 h-4" /> Esperando {longestWaiting.tiempo_espera_minutos} min
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleAttend(longestWaiting)}
-                  className="btn-primary px-8 py-4 text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all w-full md:w-auto"
-                >
-                  Atender Ahora
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* COMPACT WAITING LIST */}
-          {otherWaiting.length > 0 && (
+          {waitingSessions.length > 0 && (
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden mb-8">
               <table className="w-full text-sm text-left">
                 <thead className="bg-gray-50 text-gray-500 border-b border-gray-200">
@@ -296,25 +263,43 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {otherWaiting.map(s => (
-                    <tr key={s.id} className="hover:bg-blue-50 transition-colors">
-                      <td className="px-4 py-3 font-medium text-gray-900">{s.nombre} {s.apellido}</td>
-                      <td className="px-4 py-3 text-gray-600">{s.pais}</td>
-                      <td className="px-4 py-3 text-gray-600 truncate max-w-[200px]">{s.tema}</td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${s.type === 'video' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-                          {s.type === 'video' ? <Video className="w-3 h-3" /> : <MessageSquare className="w-3 h-3" />}
-                          {s.type === 'video' ? 'Video' : 'Chat'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right font-bold text-gray-700">{s.tiempo_espera_minutos}m</td>
-                      <td className="px-4 py-3 text-right">
-                        <button onClick={() => handleAttend(s)} className="text-green-600 hover:text-green-800 font-bold text-xs uppercase tracking-wide cursor-pointer hover:underline">
-                          Atender
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {waitingSessions.map((s, index) => {
+                    const isPriority = index === 0;
+                    return (
+                      <tr
+                        key={s.id}
+                        className={`transition-colors ${isPriority ? 'bg-indigo-50 hover:bg-indigo-100 border-l-4 border-l-indigo-600' : 'hover:bg-blue-50 border-l-4 border-l-transparent'}`}
+                      >
+                        <td className="px-4 py-3 font-medium text-gray-900">
+                          <div className="flex flex-col">
+                            <span>{s.nombre} {s.apellido}</span>
+                            {isPriority && (
+                              <span className="text-[10px] uppercase font-bold text-indigo-600 tracking-wider">Siguiente Prioridad</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">{s.pais}</td>
+                        <td className="px-4 py-3 text-gray-600 truncate max-w-[200px]">{s.tema}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${s.type === 'video' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                            {s.type === 'video' ? <Video className="w-3 h-3" /> : <MessageSquare className="w-3 h-3" />}
+                            {s.type === 'video' ? 'Video' : 'Chat'}
+                          </span>
+                        </td>
+                        <td className={`px-4 py-3 text-right font-bold ${isPriority ? 'text-indigo-700' : 'text-gray-700'}`}>
+                          {s.tiempo_espera_minutos}m
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => handleAttend(s)}
+                            className={`${isPriority ? 'bg-indigo-600 text-white hover:bg-indigo-700 px-3 py-1 rounded shadow-sm' : 'text-green-600 hover:text-green-800 hover:underline'} font-bold text-xs uppercase tracking-wide cursor-pointer transition-all`}
+                          >
+                            {isPriority ? 'Atender Ahora' : 'Atender'}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
