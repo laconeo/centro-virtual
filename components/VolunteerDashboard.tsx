@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import { LogOut, FileSpreadsheet, Users, Video, MessageSquare, RefreshCw, Activity, Clock, CheckCircle, Play, Star, Calendar } from 'lucide-react';
@@ -38,7 +38,7 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
     const countRes = await supabaseService.getOnlineVolunteersCount();
     if (countRes.count !== null) setOnlineCount(countRes.count);
   };
-
+  // ... toggleStatus logic remains
   const toggleStatus = async () => {
     const newStatus = currentStatus === 'online' ? 'busy' : 'online';
     setCurrentStatus(newStatus);
@@ -49,7 +49,7 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
 
   // Sound Utility
   const playSound = (type: 'new' | 'alert') => {
-    // ... (rest of sound utility, no changes needed here, just context)
+    // ... same logic
     try {
       const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioContext) return;
@@ -62,7 +62,6 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
       gain.connect(audioContext.destination);
 
       if (type === 'new') {
-        // "Ding" - High pitch, short
         osc.type = 'sine';
         osc.frequency.setValueAtTime(800, audioContext.currentTime);
         osc.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 0.3);
@@ -71,17 +70,12 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
         osc.start();
         osc.stop(audioContext.currentTime + 0.3);
       } else {
-        // "Alarm" - Double beep
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(440, audioContext.currentTime);
         gain.gain.setValueAtTime(0.2, audioContext.currentTime);
-
-        // First beep
         osc.start(audioContext.currentTime);
         gain.gain.setValueAtTime(0.2, audioContext.currentTime);
         gain.gain.setValueAtTime(0, audioContext.currentTime + 0.15);
-
-        // Second beep
         gain.gain.setValueAtTime(0.2, audioContext.currentTime + 0.3);
         gain.gain.setValueAtTime(0, audioContext.currentTime + 0.45);
         osc.stop(audioContext.currentTime + 0.5);
@@ -91,9 +85,9 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
     }
   };
 
-  const prevWaitingIds = React.useRef<Set<string>>(new Set());
-  const lastAlertTime = React.useRef<number>(0);
-  const activeSessionRef = React.useRef<UserSession | null>(null);
+  const prevWaitingIds = useRef<Set<string>>(new Set());
+  const lastAlertTime = useRef<number>(0);
+  const activeSessionRef = useRef<UserSession | null>(null);
 
   // Sync ref with state to avoid stale closure in interval
   useEffect(() => {

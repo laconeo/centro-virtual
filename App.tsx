@@ -52,7 +52,6 @@ function App() {
   }
 
   // Home Screen (Now UserFlow)
-  // We treat 'home' and 'user-flow' as the same thing now, effectively 'home' renders UserFlow
   return (
     <>
       <UserFlow key={userFlowKey} onExit={goHome} onVolunteerAccess={startVolunteerFlow} />
