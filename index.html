@@ -8,15 +8,22 @@
   <script>
     // Failsafe error logger
     window.addEventListener('error', function (e) {
-      // Only show if root is empty (app crashed)
-      if (!document.getElementById('root').hasChildNodes()) {
-        const msg = e.message || 'Error desconocido';
+      // Resource loading error (Script/CSS 404)
+      if (e.target && (e.target.tagName === 'SCRIPT' || e.target.tagName === 'LINK')) {
         const div = document.createElement('div');
-        div.style.cssText = 'color:red;padding:20px;background:white;position:fixed;top:0;left:0;z-index:9999;border:2px solid red;';
-        div.textContent = '❌ Error de Inicio: ' + msg;
+        div.style.cssText = 'color:red;padding:10px;background:white;border:1px solid red;position:fixed;top:50px;left:0;z-index:9999;';
+        div.textContent = '❌ Error cargando archivo: ' + (e.target.src || e.target.href);
         document.body.appendChild(div);
+        return;
       }
-    });
+
+      // Runtime error
+      const msg = e.message || JSON.stringify(e);
+      const div = document.createElement('div');
+      div.style.cssText = 'color:red;padding:20px;background:white;position:fixed;top:0;left:0;z-index:9999;border:2px solid red;';
+      div.textContent = '❌ Error Runtime: ' + msg;
+      document.body.appendChild(div);
+    }, true); 
   </script>
   <!-- Jitsi Meet API -->
   <script src="https://meet.jit.si/external_api.js"></script>
@@ -24,12 +31,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
-  <script type="module" crossorigin src="./assets/index-B1cfSZo1.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-uCOhtVFF.css">
+  <script type="module" crossorigin src="./assets/index-DHv1P8WI.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-DsahuZlB.css">
 </head>
 
 <body>
-  <div id="root"></div>
+  <div id="root" style="padding: 20px; font-family: sans-serif; text-align: center;">
+    Cargando aplicación... (Si esto no desaparece, hay un error)
+  </div>
 </body>
 
 </html>
