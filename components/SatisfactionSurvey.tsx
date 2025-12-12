@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Star, CheckCircle } from 'lucide-react';
+import { supabaseService } from '../services/supabaseService';
 import { UserSession } from '../types';
 
 interface SurveyProps {
@@ -12,11 +13,17 @@ export const SatisfactionSurvey: React.FC<SurveyProps> = ({ session, onComplete 
   const [comment, setComment] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (rating === 0) return;
-    
-    // Simulate API save
+
+    // Save to Supabase
+    await supabaseService.submitSurvey({
+      sesion_id: session.id,
+      calificacion: rating,
+      comentarios: comment
+    });
+
     setSubmitted(true);
     setTimeout(() => {
       onComplete();
@@ -38,7 +45,7 @@ export const SatisfactionSurvey: React.FC<SurveyProps> = ({ session, onComplete 
   return (
     <div className="max-w-md mx-auto bg-white p-6 rounded-lg shadow-[var(--shadow-card)] animate-slide-up">
       <h2 className="text-xl font-semibold mb-6 text-center">¿Cómo fue tu experiencia?</h2>
-      
+
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="flex justify-center gap-2">
           {[1, 2, 3, 4, 5].map((star) => (
@@ -63,8 +70,8 @@ export const SatisfactionSurvey: React.FC<SurveyProps> = ({ session, onComplete 
           onChange={(e) => setComment(e.target.value)}
         />
 
-        <button 
-          type="submit" 
+        <button
+          type="submit"
           disabled={rating === 0}
           className={`btn-primary w-full cursor-pointer ${rating === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
         >

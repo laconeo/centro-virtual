@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import { LogOut, FileSpreadsheet, Users, Video, MessageSquare, RefreshCw, Activity, Clock, CheckCircle, Play, Star, Calendar } from 'lucide-react';
 import { Volunteer, UserSession, SatisfactionSurvey } from '../types';
-import { mockService } from '../services/mockService';
+import { supabaseService } from '../services/supabaseService';
 import { initializeJitsi } from '../services/jitsi';
 import { Layout } from './ui/Layout';
 import { ChatRoom } from './ChatRoom';
@@ -17,29 +17,169 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
   const [sessions, setSessions] = useState<UserSession[]>([]);
   const [surveys, setSurveys] = useState<SatisfactionSurvey[]>([]);
   const [activeSession, setActiveSession] = useState<UserSession | null>(null);
+  const [selectedComment, setSelectedComment] = useState<string | null>(null);
 
   // Date and Status Filter
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [statusFilter, setStatusFilter] = useState<'all' | 'finalizado' | 'abandonado'>('all');
   const [filterMode, setFilterMode] = useState<'all' | 'waiting' | 'active' | 'video' | 'chat'>('all');
 
+  // Status State
+  const [currentStatus, setCurrentStatus] = useState<'online' | 'busy' | 'offline'>('online');
+  const [onlineCount, setOnlineCount] = useState(1);
+
   const fetchData = async () => {
-    const sessionRes = await mockService.getSessions();
+    const sessionRes = await supabaseService.getSessions();
     if (sessionRes.data) setSessions(sessionRes.data as UserSession[]);
 
-    const surveyRes = await mockService.getSurveys();
+    const surveyRes = await supabaseService.getSurveys();
     if (surveyRes.data) setSurveys(surveyRes.data as SatisfactionSurvey[]);
+
+    const countRes = await supabaseService.getOnlineVolunteersCount();
+    if (countRes.count !== null) setOnlineCount(countRes.count);
   };
 
-  // Poll for sessions
-  useEffect(() => {
+  const toggleStatus = async () => {
+    const newStatus = currentStatus === 'online' ? 'busy' : 'online';
+    setCurrentStatus(newStatus);
+    await supabaseService.updateVolunteerStatus(volunteer.id, newStatus);
+    toast.success(`Estado cambiado a ${newStatus === 'online' ? 'Disponible' : 'Ocupado'}`);
     fetchData();
-    const interval = setInterval(fetchData, 5000);
-    return () => clearInterval(interval);
+  };
+
+  // Sound Utility
+  const playSound = (type: 'new' | 'alert') => {
+    // ... (rest of sound utility, no changes needed here, just context)
+    try {
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContext) return;
+
+      const audioContext = new AudioContext();
+      const osc = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+
+      osc.connect(gain);
+      gain.connect(audioContext.destination);
+
+      if (type === 'new') {
+        // "Ding" - High pitch, short
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, audioContext.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 0.3);
+        gain.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+        osc.start();
+        osc.stop(audioContext.currentTime + 0.3);
+      } else {
+        // "Alarm" - Double beep
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(440, audioContext.currentTime);
+        gain.gain.setValueAtTime(0.2, audioContext.currentTime);
+
+        // First beep
+        osc.start(audioContext.currentTime);
+        gain.gain.setValueAtTime(0.2, audioContext.currentTime);
+        gain.gain.setValueAtTime(0, audioContext.currentTime + 0.15);
+
+        // Second beep
+        gain.gain.setValueAtTime(0.2, audioContext.currentTime + 0.3);
+        gain.gain.setValueAtTime(0, audioContext.currentTime + 0.45);
+        osc.stop(audioContext.currentTime + 0.5);
+      }
+    } catch (e) {
+      console.error("Audio play failed", e);
+    }
+  };
+
+  const prevWaitingIds = React.useRef<Set<string>>(new Set());
+  const lastAlertTime = React.useRef<number>(0);
+  const activeSessionRef = React.useRef<UserSession | null>(null);
+
+  // Sync ref with state to avoid stale closure in interval
+  useEffect(() => {
+    activeSessionRef.current = activeSession;
+  }, [activeSession]);
+
+  // Poll for sessions & Alerts
+  useEffect(() => {
+    const handleAlerts = (currentSessions: UserSession[]) => {
+
+      // 0. Check if ACTIVE session was finished by USER
+      if (activeSessionRef.current) {
+        const found = currentSessions.find(s => s.id === activeSessionRef.current?.id);
+        if (found && found.estado === 'finalizado') {
+          setActiveSession(null);
+          toast("El usuario ha finalizado la sesión", { icon: '👋' });
+          // Play specific sound?
+          playSound('new');
+        }
+      }
+
+      const waiting = currentSessions.filter(s => s.estado === 'esperando');
+      const now = Date.now();
+
+      // 1. Check for NEW Priority (New arrival in waiting list)
+      let hasNew = false;
+      waiting.forEach(s => {
+        if (!prevWaitingIds.current.has(s.id)) {
+          hasNew = true;
+        }
+      });
+
+      if (hasNew) {
+        playSound('new');
+        toast("¡Nueva prioridad en cola!", { icon: '🔔' });
+      }
+
+      // Update known IDs
+      prevWaitingIds.current = new Set(waiting.map(s => s.id));
+
+      // 2. Check for Long Wait (> 1 min)
+      // Throttle: only alert every 60 seconds
+      if (now - lastAlertTime.current > 60000) {
+        const hasLongWait = waiting.some(s => {
+          const waitTime = now - new Date(s.fecha_ingreso).getTime();
+          return waitTime > 60000; // > 1 minute
+        });
+
+        if (hasLongWait) {
+          playSound('alert');
+          toast("Atención: Tiempo de espera elevado", { icon: '⚠️' });
+          lastAlertTime.current = now;
+        }
+      }
+    };
+
+    fetchData(); // Initial load
+
+    // Set status to online on mount
+    supabaseService.updateVolunteerStatus(volunteer.id, 'online');
+
+    const interval = setInterval(async () => {
+      const sessionRes = await supabaseService.getSessions();
+      if (sessionRes.data) {
+        const data = sessionRes.data as UserSession[];
+        setSessions(data);
+        handleAlerts(data);
+      }
+
+      const surveyRes = await supabaseService.getSurveys();
+      if (surveyRes.data) setSurveys(surveyRes.data as SatisfactionSurvey[]);
+
+      const countRes = await supabaseService.getOnlineVolunteersCount();
+      if (countRes.count !== null) setOnlineCount(countRes.count);
+    }, 3000); // Polling every 3s
+
+    return () => {
+      clearInterval(interval);
+      // Set offline on unmount (best effort)
+      supabaseService.updateVolunteerStatus(volunteer.id, 'offline');
+    };
   }, []);
 
+  // ... (handleAttend and handleFinishSession activeSession logic unchanged) 
   const handleAttend = async (session: UserSession) => {
-    const { data } = await mockService.updateSessionStatus(session.id, 'en_atencion', volunteer.id);
+    const { data } = await supabaseService.updateSessionStatus(session.id, 'en_atencion', volunteer.id);
 
     if (data) {
       setActiveSession(data);
@@ -55,7 +195,7 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
 
   const handleFinishSession = async () => {
     if (!activeSession) return;
-    await mockService.updateSessionStatus(activeSession.id, 'finalizado');
+    await supabaseService.updateSessionStatus(activeSession.id, 'finalizado');
     setActiveSession(null);
     toast.success("Sesión finalizada");
     fetchData();
@@ -63,6 +203,7 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
 
   useEffect(() => {
     if (activeSession && activeSession.type === 'video') {
+      // ... (jitsi init logic unchanged)
       const timer = setTimeout(() => {
         initializeJitsi(
           'dashboard-jitsi',
@@ -75,7 +216,6 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
       return () => clearTimeout(timer);
     }
   }, [activeSession, volunteer.nombre]);
-
   const handleExport = () => {
     if (sessions.length === 0) {
       toast.error("No hay datos nuevos para exportar");
@@ -141,9 +281,6 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
   if (filterMode === 'video') waitingSessions = waitingSessions.filter(s => s.type === 'video');
   if (filterMode === 'chat') waitingSessions = waitingSessions.filter(s => s.type === 'chat');
 
-  const longestWaiting = waitingSessions.length > 0 ? waitingSessions[0] : null;
-  const otherWaiting = waitingSessions.length > 0 ? waitingSessions.slice(1) : [];
-
   // 2. Active List
   let activeSessionsList = sessions.filter(s => s.estado === 'en_atencion');
   if (filterMode === 'video') activeSessionsList = activeSessionsList.filter(s => s.type === 'video');
@@ -168,9 +305,8 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
   const showWaiting = ['all', 'waiting', 'video', 'chat'].includes(filterMode);
   const showActive = ['all', 'active', 'video', 'chat'].includes(filterMode);
   const showHistory = ['all', 'video', 'chat'].includes(filterMode); // Hide history when focusing on Waiting or Active specific
-
-
   if (activeSession) {
+    // ... (active session view logic unchanged)
     return (
       <div className="h-screen flex flex-col bg-gray-900">
         <div className="h-14 bg-gray-800 flex items-center justify-between px-6 text-white shadow-md z-10">
@@ -203,10 +339,24 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
       <div className="flex items-center gap-4">
         <div className="text-right hidden md:block">
           <div className="text-sm font-bold text-gray-700">{volunteer.nombre}</div>
-          <div className="text-xs text-green-600 flex items-center justify-end gap-1">
-            <span className="w-2 h-2 rounded-full bg-green-500"></span> Online
-          </div>
+          <button
+            onClick={toggleStatus}
+            className="text-xs flex items-center justify-end gap-1 cursor-pointer hover:bg-gray-100 rounded px-1 transition-colors"
+            title="Clic para cambiar estado"
+          >
+            <span className={`w-2 h-2 rounded-full ${currentStatus === 'online' ? 'bg-green-500' : 'bg-red-500'}`}></span>
+            <span className={currentStatus === 'online' ? 'text-green-600' : 'text-red-500'}>
+              {currentStatus === 'online' ? 'Online' : 'Ocupado'}
+            </span>
+          </button>
         </div>
+
+        {/* Volunteers Online Count Badge */}
+        <div className="flex items-center gap-1 bg-blue-50 text-[var(--color-fs-blue)] px-2 py-1 rounded-full text-xs font-bold" title="Voluntarios conectados">
+          <Users className="w-3 h-3" />
+          <span>{onlineCount}</span>
+        </div>
+
         <button onClick={onLogout} className="text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors cursor-pointer" title="Salir">
           <LogOut className="w-5 h-5" />
         </button>
@@ -249,7 +399,7 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
             </button>
           </div>
 
-          {waitingSessions.length > 0 && (
+          {waitingSessions.length > 0 ? (
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden mb-8">
               <table className="w-full text-sm text-left">
                 <thead className="bg-gray-50 text-gray-500 border-b border-gray-200">
@@ -265,34 +415,37 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
                 <tbody className="divide-y divide-gray-100">
                   {waitingSessions.map((s, index) => {
                     const isPriority = index === 0;
+                    // Calculate real-time wait minutes
+                    const waitMinutes = Math.max(0, Math.floor((Date.now() - new Date(s.fecha_ingreso).getTime()) / 60000));
+
                     return (
                       <tr
                         key={s.id}
-                        className={`transition-colors ${isPriority ? 'bg-indigo-50 hover:bg-indigo-100 border-l-4 border-l-indigo-600' : 'hover:bg-blue-50 border-l-4 border-l-transparent'}`}
+                        className={`transition-colors ${isPriority ? 'bg-[var(--color-primary-50)] hover:bg-[var(--color-primary-100)] border-l-4 border-l-[var(--color-fs-green)]' : 'hover:bg-gray-50 border-l-4 border-l-transparent'}`}
                       >
                         <td className="px-4 py-3 font-medium text-gray-900">
                           <div className="flex flex-col">
                             <span>{s.nombre} {s.apellido}</span>
                             {isPriority && (
-                              <span className="text-[10px] uppercase font-bold text-indigo-600 tracking-wider">Siguiente Prioridad</span>
+                              <span className="text-[10px] uppercase font-bold text-[var(--color-fs-green-dark)] tracking-wider">Siguiente Prioridad</span>
                             )}
                           </div>
                         </td>
                         <td className="px-4 py-3 text-gray-600">{s.pais}</td>
                         <td className="px-4 py-3 text-gray-600 truncate max-w-[200px]">{s.tema}</td>
                         <td className="px-4 py-3">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${s.type === 'video' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${s.type === 'video' ? 'bg-blue-50 text-[var(--color-fs-blue)]' : 'bg-gray-100 text-gray-700'}`}>
                             {s.type === 'video' ? <Video className="w-3 h-3" /> : <MessageSquare className="w-3 h-3" />}
                             {s.type === 'video' ? 'Video' : 'Chat'}
                           </span>
                         </td>
-                        <td className={`px-4 py-3 text-right font-bold ${isPriority ? 'text-indigo-700' : 'text-gray-700'}`}>
-                          {s.tiempo_espera_minutos}m
+                        <td className={`px-4 py-3 text-right font-bold ${isPriority ? 'text-[var(--color-fs-green-dark)]' : 'text-gray-700'} ${waitMinutes >= 1 ? 'text-red-600 animate-pulse' : ''}`}>
+                          {waitMinutes}m
                         </td>
                         <td className="px-4 py-3 text-right">
                           <button
                             onClick={() => handleAttend(s)}
-                            className={`${isPriority ? 'bg-indigo-600 text-white hover:bg-indigo-700 px-3 py-1 rounded shadow-sm' : 'text-green-600 hover:text-green-800 hover:underline'} font-bold text-xs uppercase tracking-wide cursor-pointer transition-all`}
+                            className={`${isPriority ? 'bg-[var(--color-fs-green)] text-white hover:bg-[var(--color-fs-green-dark)] px-3 py-1 rounded shadow-sm' : 'text-[var(--color-fs-blue)] hover:text-[var(--color-fs-blue-hover)] hover:underline'} font-bold text-xs uppercase tracking-wide cursor-pointer transition-all`}
                           >
                             {isPriority ? 'Atender Ahora' : 'Atender'}
                           </button>
@@ -303,6 +456,14 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
                 </tbody>
               </table>
             </div>
+          ) : (
+            <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-12 text-center mb-8 flex flex-col items-center animate-fade-in">
+              <div className="w-16 h-16 bg-[var(--color-primary-50)] text-[var(--color-fs-green)] rounded-full flex items-center justify-center mb-4">
+                <CheckCircle className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">No hay personas en espera</h3>
+              <p className="text-gray-500">¡Excelente trabajo! Todo está al día por el momento.</p>
+            </div>
           )}
         </>
       )}
@@ -310,12 +471,12 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
       {/* Active Sessions List */}
       {showActive && activeSessionsList.length > 0 && (
         <div className="mb-8">
-          <h3 className="text-lg font-semibold text-green-700 mb-3 flex items-center gap-2">
+          <h3 className="text-lg font-semibold text-[var(--color-fs-blue)] mb-3 flex items-center gap-2">
             <Activity className="w-5 h-5" /> Sesiones en Curso ({activeSessionsList.length})
           </h3>
-          <div className="bg-white rounded-lg border border-green-200 overflow-hidden shadow-sm">
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
             <table className="w-full text-sm text-left">
-              <thead className="bg-green-50 text-green-700 border-b border-green-200">
+              <thead className="bg-gray-50 text-gray-700 border-b border-gray-200">
                 <tr>
                   <th className="px-4 py-3">Hora Inicio</th>
                   <th className="px-4 py-3">Usuario</th>
@@ -333,35 +494,35 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
                   const activeDuration = Math.max(0, Math.floor((Date.now() - startTime) / 60000));
 
                   return (
-                    <tr key={s.id} className="hover:bg-green-50/50">
+                    <tr key={s.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-gray-600">{new Date(startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                       <td className="px-4 py-3 font-medium text-gray-900">{s.nombre} {s.apellido}</td>
                       <td className="px-4 py-3 text-gray-600 truncate max-w-[200px]">{s.tema}</td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${s.type === 'video' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${s.type === 'video' ? 'bg-blue-50 text-[var(--color-fs-blue)]' : 'bg-gray-100 text-gray-700'}`}>
                           {s.type === 'video' ? <Video className="w-3 h-3" /> : <MessageSquare className="w-3 h-3" />}
                           {s.type === 'video' ? 'Video' : 'Chat'}
                         </span>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <span className={`w-2 h-2 rounded-full ${isMine ? 'bg-green-500' : 'bg-gray-300'}`}></span>
+                          <span className={`w-2 h-2 rounded-full ${isMine ? 'bg-[var(--color-fs-green)]' : 'bg-gray-300'}`}></span>
                           <span className="text-gray-700 font-medium">{isMine ? 'Tú' : 'Otro Voluntario'}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-right font-bold text-green-600">{activeDuration} min</td>
+                      <td className="px-4 py-3 text-right font-bold text-[var(--color-fs-green-dark)]">{activeDuration} min</td>
                       <td className="px-4 py-3 text-right">
                         {isMine ? (
                           <button
                             onClick={() => setActiveSession(s)}
-                            className="text-green-600 hover:text-green-800 font-bold text-xs uppercase cursor-pointer hover:underline flex items-center justify-end gap-1 w-full"
+                            className="text-[var(--color-fs-green)] hover:text-[var(--color-fs-green-dark)] font-bold text-xs uppercase cursor-pointer hover:underline flex items-center justify-end gap-1 w-full"
                           >
                             Retomar <Play className="w-3 h-3" />
                           </button>
                         ) : (
                           <button
                             onClick={() => setActiveSession(s)}
-                            className="text-blue-600 hover:text-blue-800 font-bold text-xs uppercase cursor-pointer hover:underline flex items-center justify-end gap-1 w-full"
+                            className="text-[var(--color-fs-blue)] hover:text-[var(--color-fs-blue-hover)] font-bold text-xs uppercase cursor-pointer hover:underline flex items-center justify-end gap-1 w-full"
                           >
                             Ayudar <Users className="w-3 h-3" />
                           </button>
@@ -417,11 +578,13 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
                   <tr>
                     <th className="px-4 py-3">Hora</th>
                     <th className="px-4 py-3">Usuario</th>
+                    <th className="px-4 py-3">País</th>
                     <th className="px-4 py-3">Tema</th>
                     <th className="px-4 py-3">Canal</th>
-                    <th className="px-4 py-3">Estado</th>
+                    <th className="px-4 py-3 text-center">Espera</th>
+                    <th className="px-4 py-3 text-center">Duración</th>
                     <th className="px-4 py-3">Atendido Por</th>
-                    <th className="px-4 py-3 text-center">Calificación</th>
+                    <th className="px-4 py-3 text-center">Calificación / Feedback</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -432,6 +595,7 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
                       <tr key={s.id} className={isAbandoned ? 'bg-red-50' : 'hover:bg-gray-50'}>
                         <td className="px-4 py-3 text-gray-600">{new Date(s.fecha_ingreso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                         <td className="px-4 py-3 font-medium text-gray-900">{s.nombre} {s.apellido}</td>
+                        <td className="px-4 py-3 text-gray-600">{s.pais}</td>
                         <td className="px-4 py-3 text-gray-600 truncate max-w-[200px]">{s.tema}</td>
                         <td className="px-4 py-3">
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${s.type === 'video' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
@@ -439,15 +603,14 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
                             {s.type === 'video' ? 'Video' : 'Chat'}
                           </span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 text-center text-gray-600">
+                          {s.tiempo_espera_minutos}m
+                        </td>
+                        <td className="px-4 py-3 text-center">
                           {isAbandoned ? (
-                            <span className="inline-flex items-center gap-1 text-red-700 bg-red-100 px-2 py-0.5 rounded text-xs font-semibold">
-                              Abandonado
-                            </span>
+                            <span className="text-red-500 text-xs">-</span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-green-700 bg-green-100 px-2 py-0.5 rounded text-xs font-semibold">
-                              Atendido
-                            </span>
+                            <span className="font-semibold text-gray-700">{s.duracion_conversacion_minutos || 0}m</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-gray-600">
@@ -457,10 +620,21 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
                         </td>
                         <td className="px-4 py-3 text-center">
                           {survey ? (
-                            <div className="flex items-center justify-center gap-0.5 text-yellow-400">
-                              {Array.from({ length: 5 }).map((_, i) => (
-                                <Star key={i} className={`w-3 h-3 ${i < survey.calificacion ? 'fill-current' : 'text-gray-200'}`} />
-                              ))}
+                            <div className="flex items-center justify-center gap-3">
+                              <div className="flex items-center gap-0.5 text-yellow-400">
+                                {Array.from({ length: 5 }).map((_, i) => (
+                                  <Star key={i} className={`w-3 h-3 ${i < survey.calificacion ? 'fill-current' : 'text-gray-200'}`} />
+                                ))}
+                              </div>
+                              {survey.comentarios && (
+                                <button
+                                  onClick={() => setSelectedComment(survey.comentarios!)}
+                                  className="text-[var(--color-fs-blue)] hover:text-[var(--color-fs-blue-hover)] bg-blue-50 p-1.5 rounded-full transition-colors cursor-pointer"
+                                  title="Ver comentario"
+                                >
+                                  <MessageSquare className="w-4 h-4" />
+                                </button>
+                              )}
                             </div>
                           ) : (
                             <span className="text-gray-300 text-xs">-</span>
@@ -473,6 +647,33 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
               </table>
             </div>
           )}
+        </div>
+      )}
+      {/* Comment Modal */}
+      {selectedComment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-fade-in">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 relative animate-slide-up">
+            <button
+              onClick={() => setSelectedComment(null)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 cursor-pointer"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
+            <h3 className="text-lg font-bold text-[var(--color-fs-blue)] mb-4 flex items-center gap-2">
+              <MessageSquare className="w-5 h-5" /> Comentario del Usuario
+            </h3>
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-100 text-gray-700 italic">
+              "{selectedComment}"
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setSelectedComment(null)}
+                className="btn-primary cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </Layout>

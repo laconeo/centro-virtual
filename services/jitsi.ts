@@ -17,7 +17,10 @@ export const initializeJitsi = (
     return null;
   }
 
-  const domain = 'meet.jit.si';
+  // 'meet.jit.si' now requires authentication for room creation (moderator). 
+  // We use a community instance that allows anonymous rooms for this demo.
+  // Alternatives: 'meet.ffmuc.net', 'jitsi.riot.im'
+  const domain = 'meet.guifi.net';
   const options = {
     roomName: roomName,
     width: '100%',
@@ -26,14 +29,16 @@ export const initializeJitsi = (
     userInfo: {
       displayName: displayName
     },
+    lang: 'es', // Force Spanish interface
     configOverwrite: {
+      defaultLanguage: 'es',
       startWithAudioMuted: false,
       startWithVideoMuted: false,
-      prejoinPageEnabled: false, // Skip pre-join screen for faster connection
-      // Disable deep linking to mobile apps for smoother web experience
-      disableDeepLinking: true, 
+      prejoinPageEnabled: false,
+      disableDeepLinking: true,
     },
     interfaceConfigOverwrite: {
+      DEFAULT_LOCAL_DISPLAY_NAME: 'Yo',
       TOOLBAR_BUTTONS: [
         'microphone', 'camera', 'closedcaptions', 'desktop', 'fullscreen',
         'fodeviceselection', 'hangup', 'profile', 'chat', 'recording',
@@ -53,8 +58,8 @@ export const initializeJitsi = (
       api.dispose();
     },
     readyToClose: () => {
-        onDisconnect();
-        api.dispose();
+      onDisconnect();
+      api.dispose();
     }
   });
 

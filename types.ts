@@ -6,6 +6,8 @@ export interface UserSession {
   pais: string;
   tema: string;
   fecha_ingreso: string; // ISO String
+  fecha_atencion?: string; // ISO String - When volunteer started help
+  fecha_fin?: string; // ISO String - When session ended
   tiempo_espera_minutos: number;
   duracion_conversacion_minutos?: number;
   sala_jitsi_id: string;
@@ -27,6 +29,7 @@ export interface Volunteer {
   id: string; // UUID
   email: string;
   nombre: string;
+  status: 'online' | 'offline' | 'busy';
   created_at: string;
 }
 

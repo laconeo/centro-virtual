@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Send, User, BadgeHelp } from 'lucide-react';
 import { UserSession, Message } from '../types';
-import { mockService } from '../services/mockService';
+import { supabaseService } from '../services/supabaseService';
 
 interface ChatRoomProps {
     session: UserSession;
@@ -17,7 +17,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ session, currentUser, onExit
     // Poll for messages
     useEffect(() => {
         const fetchMessages = async () => {
-            const { data } = await mockService.getMessages(session.id);
+            const { data } = await supabaseService.getMessages(session.id);
             if (data) setMessages(data as Message[]);
         };
 
@@ -35,11 +35,11 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ session, currentUser, onExit
         e.preventDefault();
         if (!inputText.trim()) return;
 
-        await mockService.sendMessage(session.id, currentUser, inputText);
+        await supabaseService.sendMessage(session.id, currentUser, inputText);
         setInputText('');
 
         // Immediate refresh
-        const { data } = await mockService.getMessages(session.id);
+        const { data } = await supabaseService.getMessages(session.id);
         if (data) setMessages(data as Message[]);
     };
 
@@ -94,8 +94,8 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ session, currentUser, onExit
                         <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                             <div
                                 className={`max-w-[80%] rounded-lg p-3 shadow-sm ${isMe
-                                        ? 'bg-[var(--color-primary-100)] text-[var(--color-fs-text)] rounded-br-none'
-                                        : 'bg-white text-[var(--color-fs-text)] rounded-bl-none border border-gray-200'
+                                    ? 'bg-[var(--color-primary-100)] text-[var(--color-fs-text)] rounded-br-none'
+                                    : 'bg-white text-[var(--color-fs-text)] rounded-bl-none border border-gray-200'
                                     }`}
                             >
                                 <p className="text-sm">{msg.text}</p>
@@ -110,13 +110,16 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ session, currentUser, onExit
             </div>
 
             {/* Input Area */}
-            <form onSubmit={handleSendMessage} className="bg-white p-3 border-t border-[var(--color-fs-border)] flex gap-2">
+            <form onSubmit={handleSendMessage} className="bg-white p-3 border-t border-[var(--color-fs-border)] flex gap-2 sticky bottom-0 z-10">
                 <input
                     type="text"
+                    inputMode="text"
+                    enterKeyHint="send"
+                    autoComplete="off"
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
                     placeholder="Escriba su mensaje aquí..."
-                    className="flex-1 border border-gray-300 rounded-full px-4 py-2 focus:outline-none focus:border-[var(--color-fs-blue)]"
+                    className="flex-1 border border-gray-300 rounded-full px-4 py-2 focus:outline-none focus:border-[var(--color-fs-blue)] text-base"
                 />
                 <button
                     type="submit"

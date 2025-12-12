@@ -6,12 +6,14 @@ export const MOCK_VOLUNTEERS: Volunteer[] = [
     id: 'vol-1',
     email: 'misionero@servicio.org',
     nombre: 'Elder Smith',
+    status: 'online',
     created_at: new Date('2024-01-01').toISOString()
   },
   {
     id: 'vol-2',
     email: 'hermana@servicio.org',
     nombre: 'Hermana Jones',
+    status: 'offline',
     created_at: new Date('2024-01-15').toISOString()
   }
 ];
