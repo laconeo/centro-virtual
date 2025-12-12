@@ -1,19 +1,35 @@
 <!DOCTYPE html>
 <html lang="es">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
-    <title>Sistema de Orientación Virtual</title>
-    <!-- Jitsi Meet API -->
-    <script src="https://meet.jit.si/external_api.js"></script>
-    <!-- Google Fonts (Roboto) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
-  <script type="module" crossorigin src="/centro-virtual/assets/index-B1cfSZo1.js"></script>
-  <link rel="stylesheet" crossorigin href="/centro-virtual/assets/index-uCOhtVFF.css">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
+  <title>Sistema de Orientación Virtual</title>
+  <script>
+    // Failsafe error logger
+    window.addEventListener('error', function (e) {
+      // Only show if root is empty (app crashed)
+      if (!document.getElementById('root').hasChildNodes()) {
+        const msg = e.message || 'Error desconocido';
+        const div = document.createElement('div');
+        div.style.cssText = 'color:red;padding:20px;background:white;position:fixed;top:0;left:0;z-index:9999;border:2px solid red;';
+        div.textContent = '❌ Error de Inicio: ' + msg;
+        document.body.appendChild(div);
+      }
+    });
+  </script>
+  <!-- Jitsi Meet API -->
+  <script src="https://meet.jit.si/external_api.js"></script>
+  <!-- Google Fonts (Roboto) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <script type="module" crossorigin src="./assets/index-B1cfSZo1.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-uCOhtVFF.css">
 </head>
-  <body>
-    <div id="root"></div>
-  </body>
+
+<body>
+  <div id="root"></div>
+</body>
+
 </html>
