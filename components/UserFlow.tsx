@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { useLanguage } from '../src/contexts/LanguageContext';
 import { Video, MessageSquare, Loader2 } from 'lucide-react';
 import { Layout } from './ui/Layout';
 import { UserSession } from '../types';
@@ -18,6 +19,7 @@ type Step = 'selection' | 'form' | 'waiting' | 'call' | 'chat-active' | 'feedbac
 type Mode = 'video' | 'chat';
 
 export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess }) => {
+  const { t } = useLanguage();
   const [step, setStep] = useState<Step>('selection');
 
   const [mode, setMode] = useState<Mode>('video');
@@ -59,7 +61,7 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.terms) {
-      toast.error("Debes aceptar los términos y condiciones");
+      toast.error(t('error_terms'));
       return;
     }
 
@@ -94,9 +96,9 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
     if (data) {
       setSessionData(data);
       setStep('waiting');
-      toast.success("Solicitud enviada correctamente");
+      toast.success(t('success_request'));
     } else {
-      toast.error("Error al crear la sesión");
+      toast.error(t('error_request'));
     }
   };
 
@@ -104,7 +106,7 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
   const handleCancel = async () => {
     if (sessionData) {
       await supabaseService.updateSessionStatus(sessionData.id, 'abandonado');
-      toast("Solicitud cancelada");
+      toast(t('cancel_request'));
       onExit();
     }
   };
@@ -122,10 +124,10 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
           setSessionData(data);
           if (data.type === 'chat') {
             setStep('chat-active');
-            toast.success("Un voluntario se ha unido al chat");
+            toast.success(t('volunteer_joined_chat'));
           } else {
             setStep('call');
-            toast.success("Voluntario conectado");
+            toast.success(t('volunteer_connected'));
           }
         }
       }, 3000);
@@ -133,7 +135,7 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
       // Timeout after 5 minutes
       timeoutTimer = setTimeout(async () => {
         await supabaseService.updateSessionStatus(sessionData.id, 'abandonado');
-        toast.error("Lo sentimos, no hay voluntarios disponibles en este momento.");
+        toast.error(t('no_volunteers'));
         onExit();
       }, 5 * 60 * 1000);
     }
@@ -178,7 +180,7 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
       <Layout showBack={false} onVolunteerClick={onVolunteerAccess}>
         <div className="max-w-4xl mx-auto py-2 md:py-10 animate-fade-in flex flex-col justify-center min-h-[70vh] md:min-h-0 md:block">
           <h2 className="text-xl md:text-2xl text-center mb-4 md:mb-10 font-light text-[var(--color-fs-text)]">
-            ¿Cómo le gustaría comunicarse con nosotros?
+            {t('welcome_title')}
           </h2>
 
           <div className="grid md:grid-cols-2 gap-4 md:gap-8 max-w-2xl mx-auto">
@@ -189,8 +191,8 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
               <div className="w-16 h-16 md:w-20 md:h-20 bg-blue-100 rounded-full flex items-center justify-center mb-4 md:mb-6 group-hover:scale-110 transition-transform text-[var(--color-fs-blue)]">
                 <Video className="w-8 h-8 md:w-10 md:h-10" />
               </div>
-              <span className="text-lg md:text-xl font-bold text-[var(--color-fs-blue)] uppercase tracking-wide">Video Llamada</span>
-              <span className="text-xs md:text-sm text-gray-500 mt-2 text-center">Hable cara a cara con un Misionero de Servicio</span>
+              <span className="text-lg md:text-xl font-bold text-[var(--color-fs-blue)] uppercase tracking-wide">{t('video_call')}</span>
+              <span className="text-xs md:text-sm text-gray-500 mt-2 text-center">{t('video_desc')}</span>
             </button>
 
             <button
@@ -200,8 +202,8 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
               <div className="w-16 h-16 md:w-20 md:h-20 bg-[var(--color-primary-100)] rounded-full flex items-center justify-center mb-4 md:mb-6 group-hover:scale-110 transition-transform text-[var(--color-primary-800)]">
                 <MessageSquare className="w-8 h-8 md:w-10 md:h-10" />
               </div>
-              <span className="text-lg md:text-xl font-bold text-[var(--color-primary-800)] uppercase tracking-wide">Chat</span>
-              <span className="text-xs md:text-sm text-gray-500 mt-2 text-center">Escriba sus preguntas en tiempo real</span>
+              <span className="text-lg md:text-xl font-bold text-[var(--color-fs-blue)] uppercase tracking-wide">{t('chat_option')}</span>
+              <span className="text-xs md:text-sm text-gray-500 mt-2 text-center">{t('chat_desc')}</span>
             </button>
           </div>
         </div>
@@ -211,41 +213,41 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
 
   if (step === 'form') {
     return (
-      <Layout title={`Solicitar ${mode === 'video' ? 'Video Llamada' : 'Chat'}`} showBack onBack={() => setStep('selection')} onVolunteerClick={onVolunteerAccess}>
+      <Layout title={mode === 'video' ? t('request_video_title') : t('request_chat_title')} showBack onBack={() => setStep('selection')} onVolunteerClick={onVolunteerAccess}>
         <div className="max-w-md mx-auto bg-white p-6 rounded-lg shadow-[var(--shadow-card)] animate-fade-in">
           <h2 className="text-xl mb-4 font-semibold text-[var(--color-primary)]">
-            {mode === 'video' ? 'Inicia tu videoconsulta' : 'Inicia el chat de ayuda'}
+            {mode === 'video' ? t('start_video_header') : t('start_chat_header')}
           </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <input
                 type="text"
                 className="w-full border border-gray-300 rounded p-2"
-                required placeholder="Nombre"
+                required placeholder={t('form_name')}
                 value={formData.nombre}
                 onChange={e => setFormData({ ...formData, nombre: e.target.value })}
               />
               <input
                 type="text"
                 className="w-full border border-gray-300 rounded p-2"
-                required placeholder="Apellido"
+                required placeholder={t('form_surname')}
                 value={formData.apellido}
                 onChange={e => setFormData({ ...formData, apellido: e.target.value })}
               />
             </div>
 
             <select required value={formData.pais} onChange={e => setFormData({ ...formData, pais: e.target.value })}>
-              <option value="">Selecciona tu país</option>
+              <option value="">{t('form_country_placeholder')}</option>
               {PAISES.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
 
             <select required value={formData.tema} onChange={e => setFormData({ ...formData, tema: e.target.value })}>
-              <option value="">¿Sobre qué tema necesitas ayuda?</option>
+              <option value="">{t('form_topic_placeholder')}</option>
               {TEMAS.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
 
             <input
-              type="email" placeholder="Email (Opcional)"
+              type="email" placeholder={t('form_email')}
               value={formData.email}
               onChange={e => setFormData({ ...formData, email: e.target.value })}
             />
@@ -258,11 +260,11 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
                 checked={formData.terms}
                 onChange={e => setFormData({ ...formData, terms: e.target.checked })}
               />
-              <label htmlFor="terms" className="cursor-pointer">Acepto los términos y condiciones</label>
+              <label htmlFor="terms" className="cursor-pointer">{t('form_terms')}</label>
             </div>
 
             <button type="submit" className="btn-primary w-full mt-4 cursor-pointer">
-              {mode === 'video' ? 'Iniciar Conversación' : 'Entrar al Chat'}
+              {mode === 'video' ? t('btn_start_video') : t('btn_start_chat')}
             </button>
           </form>
         </div>
@@ -272,16 +274,16 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
 
   if (step === 'waiting') {
     return (
-      <Layout title="Sala de Espera" onVolunteerClick={onVolunteerAccess}>
+      <Layout title={t('waiting_title')} onVolunteerClick={onVolunteerAccess}>
         <div className="flex flex-col items-center justify-center py-20 animate-fade-in text-center">
           <Loader2 className="w-16 h-16 text-[var(--color-primary)] animate-spin mb-6" />
-          <h2 className="text-2xl font-light mb-2">Esperando a un voluntario...</h2>
-          <p className="text-[var(--color-fs-text-light)]">Por favor no cierres esta ventana.</p>
+          <h2 className="text-2xl font-light mb-2">{t('waiting_status')}</h2>
+          <p className="text-[var(--color-fs-text-light)]">{t('waiting_desc')}</p>
           <div className="mt-8 p-4 bg-blue-50 text-[var(--color-fs-blue)] rounded-lg text-sm max-w-md">
-            Un consultor revisará tu solicitud ({sessionData?.tema}) y se unirá en breve.
+            {t('waiting_info').replace('{topic}', sessionData?.tema || '')}
           </div>
           <button onClick={handleCancel} className="mt-8 text-red-500 hover:text-red-700 font-medium text-sm underline cursor-pointer">
-            Cancelar solicitud
+            {t('cancel_request')}
           </button>
         </div>
       </Layout>
@@ -290,15 +292,16 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
 
   if (step === 'chat-active' && sessionData) {
     return (
-      <Layout title="Chat de Asistencia" showBack={false}>
-        <div className="max-w-4xl mx-auto h-[calc(100dvh-100px)] md:h-[80vh] animate-fade-in shadow-[var(--shadow-card)] my-4 rounded-lg overflow-hidden">
+      <div className="fixed inset-0 z-50 bg-[var(--color-fs-bg-alt)] flex flex-col items-center">
+        {/* Full screen container avoiding Layout wrapper for better mobile keyboard handling */}
+        <div className="w-full h-full md:h-[85vh] md:max-w-4xl md:mt-6 animate-fade-in shadow-none md:shadow-[var(--shadow-card)]">
           <ChatRoom
             session={sessionData}
             currentUser="user"
             onExit={handleUserExit}
           />
         </div>
-      </Layout>
+      </div>
     );
   }
 
@@ -312,7 +315,7 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
 
   if (step === 'feedback') {
     return (
-      <Layout title="Encuesta de Satisfacción" onVolunteerClick={onVolunteerAccess}>
+      <Layout title={t('survey_title')} onVolunteerClick={onVolunteerAccess}>
         <SatisfactionSurvey session={sessionData!} onComplete={onExit} />
       </Layout>
     );

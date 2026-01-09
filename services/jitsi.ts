@@ -17,10 +17,10 @@ export const initializeJitsi = (
     return null;
   }
 
-  // 'meet.jit.si' now requires authentication for room creation (moderator). 
-  // We use a community instance that allows anonymous rooms for this demo.
-  // Alternatives: 'meet.ffmuc.net', 'jitsi.riot.im'
-  const domain = 'meet.guifi.net';
+  // 'meet.jit.si' now requires authentication.
+  // We use a reliable community instance: 'meet.ffmuc.net' (Freifunk Munich)
+  // which usually respects the language parameter better.
+  const domain = 'meet.ffmuc.net';
   const options = {
     roomName: roomName,
     width: '100%',

@@ -252,7 +252,18 @@ class SupabaseService {
         return { error };
     }
 
+    async getOnlineVolunteers() {
+        // Return full list of online volunteers
+        const { data, error } = await supabase
+            .from('volunteers')
+            .select('*')
+            .eq('status', 'online');
+
+        return { data: data || [], error };
+    }
+
     async getOnlineVolunteersCount() {
+        // Keep this for backward compatibility if needed, or just use the new one length
         const { count, error } = await supabase
             .from('volunteers')
             .select('*', { count: 'exact', head: true })

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useLanguage } from '../src/contexts/LanguageContext';
 import { Star, CheckCircle } from 'lucide-react';
 import { supabaseService } from '../services/supabaseService';
 import { UserSession } from '../types';
@@ -9,6 +10,7 @@ interface SurveyProps {
 }
 
 export const SatisfactionSurvey: React.FC<SurveyProps> = ({ session, onComplete }) => {
+  const { t } = useLanguage();
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -36,15 +38,15 @@ export const SatisfactionSurvey: React.FC<SurveyProps> = ({ session, onComplete 
         <div className="text-[var(--color-primary)] mb-4 flex justify-center">
           <CheckCircle className="w-16 h-16" />
         </div>
-        <h2 className="text-2xl mb-2">¡Gracias por tu feedback!</h2>
-        <p className="text-gray-500">Esperamos haberte ayudado.</p>
+        <h2 className="text-2xl mb-2">{t('survey_thanks_title')}</h2>
+        <p className="text-gray-500">{t('survey_thanks_desc')}</p>
       </div>
     );
   }
 
   return (
     <div className="max-w-md mx-auto bg-white p-6 rounded-lg shadow-[var(--shadow-card)] animate-slide-up">
-      <h2 className="text-xl font-semibold mb-6 text-center">¿Cómo fue tu experiencia?</h2>
+      <h2 className="text-xl font-semibold mb-6 text-center">{t('survey_question')}</h2>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="flex justify-center gap-2">
@@ -60,11 +62,11 @@ export const SatisfactionSurvey: React.FC<SurveyProps> = ({ session, onComplete 
           ))}
         </div>
         <p className="text-center text-sm text-gray-500">
-          {rating === 0 ? 'Selecciona una calificación' : rating === 5 ? '¡Excelente!' : rating === 1 ? 'Mala experiencia' : 'Gracias'}
+          {rating === 0 ? t('survey_rating_0') : rating === 5 ? t('survey_rating_5') : rating === 1 ? t('survey_rating_1') : t('survey_rating_thank')}
         </p>
 
         <textarea
-          placeholder="Comentarios adicionales (opcional)"
+          placeholder={t('survey_placeholder')}
           className="w-full h-24 resize-none"
           value={comment}
           onChange={(e) => setComment(e.target.value)}
@@ -75,7 +77,7 @@ export const SatisfactionSurvey: React.FC<SurveyProps> = ({ session, onComplete 
           disabled={rating === 0}
           className={`btn-primary w-full cursor-pointer ${rating === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
-          Enviar Encuesta
+          {t('survey_submit')}
         </button>
       </form>
     </div>

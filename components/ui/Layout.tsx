@@ -1,5 +1,6 @@
-import React from 'react';
-import { ChevronLeft } from 'lucide-react';
+import React, { useState } from 'react';
+import { ChevronLeft, Globe } from 'lucide-react';
+import { useLanguage } from '../../src/contexts/LanguageContext';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -11,6 +12,9 @@ interface LayoutProps {
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onBack, onVolunteerClick, rightContent }) => {
+  const { language, setLanguage, availableLanguages, t } = useLanguage();
+  const [isLangOpen, setIsLangOpen] = useState(false);
+
   return (
     <div className="min-h-screen flex flex-col items-center bg-[var(--color-fs-bg-alt)]">
       {/* Navbar simulando estilo Frontier */}
@@ -23,11 +27,53 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onBac
               </button>
             )}
             <div className="flex flex-col">
-              <span className="font-bold text-lg text-[var(--color-primary)]">Centro Virtual</span>
+              <span className="font-bold text-lg text-[var(--color-primary)]">{t('app_title')}</span>
               {title && <span className="text-xs text-[var(--color-fs-text-light)]">{title}</span>}
             </div>
           </div>
-          {rightContent && <div>{rightContent}</div>}
+
+          <div className="flex items-center gap-3">
+            {rightContent && <div>{rightContent}</div>}
+
+            {/* Language Switcher */}
+            <div className="relative">
+              <button
+                onClick={() => setIsLangOpen(!isLangOpen)}
+                className="p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600 flex items-center gap-1"
+                title="Cambiar idioma"
+              >
+                <Globe className="w-5 h-5" />
+                <span className="text-xs font-medium uppercase">{language}</span>
+              </button>
+
+              {isLangOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setIsLangOpen(false)}
+                  ></div>
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-20 border border-gray-100">
+                    {availableLanguages.map((lang) => (
+                      <button
+                        key={lang.code}
+                        onClick={() => {
+                          setLanguage(lang.code);
+                          setIsLangOpen(false);
+                        }}
+                        className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors ${language === lang.code ? 'text-[var(--color-primary)] font-semibold bg-blue-50' : 'text-gray-700'
+                          }`}
+                      >
+                        {lang.label}
+                      </button>
+                    ))}
+                    {availableLanguages.length === 0 && (
+                      <div className="px-4 py-2 text-sm text-gray-400">No languages found</div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </nav>
 
@@ -38,13 +84,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onBac
 
       <footer className="w-full py-6 text-center text-sm text-[var(--color-fs-text-light)]">
         <div className="flex flex-col items-center gap-2">
-          <span>© 2025 Servicios de apoyo para usuarios de FS</span>
+          <span>{t('footer_text')}</span>
           {onVolunteerClick && (
             <button
               onClick={onVolunteerClick}
               className="text-xs text-gray-400 hover:text-gray-600 transition-colors cursor-pointer border-none bg-transparent underline"
             >
-              Acceso misioneros de servicio
+              {t('footer_volunteer_access')}
             </button>
           )}
         </div>
