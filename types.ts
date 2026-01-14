@@ -30,6 +30,7 @@ export interface Volunteer {
   email: string;
   nombre: string;
   status: 'online' | 'offline' | 'busy';
+  last_status_change?: string; // ISO String
   created_at: string;
 }
 
@@ -38,5 +39,13 @@ export interface SatisfactionSurvey {
   sesion_id: string;
   calificacion: number; // 1-5
   comentarios?: string;
+  created_at: string;
+}
+
+export interface Topic {
+  id: string;
+  pais: string;
+  titulo: string;
+  active: boolean;
   created_at: string;
 }

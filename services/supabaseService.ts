@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { UserSession, Volunteer, SatisfactionSurvey, Message } from '../types';
+import { UserSession, Volunteer, SatisfactionSurvey, Message, Topic } from '../types';
 
 class SupabaseService {
 
@@ -235,8 +235,12 @@ class SupabaseService {
         // Real Password Recovery
         // NOTE: This ONLY works if the user exists in Supabase Auth (auth.users).
         // If the user is only in the public.volunteers table (legacy), this will send nothing.
+
+        // Always redirect to the production URL as requested
+        const redirectTo = 'https://laconeo.github.io/centro-virtual';
+
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: window.location.origin, // Check Supabase Dashboard -> URL Configuration
+            redirectTo,
         });
 
         if (error) return { error: error.message };
@@ -244,9 +248,12 @@ class SupabaseService {
     }
 
     async updateVolunteerStatus(id: string, status: 'online' | 'offline' | 'busy') {
+        const updates: any = { status };
+        updates.last_status_change = new Date().toISOString();
+
         const { error } = await supabase
             .from('volunteers')
-            .update({ status })
+            .update(updates)
             .eq('id', id);
 
         return { error };
@@ -258,6 +265,15 @@ class SupabaseService {
             .from('volunteers')
             .select('*')
             .eq('status', 'online');
+
+        return { data: data || [], error };
+    }
+
+    async getAllVolunteers() {
+        const { data, error } = await supabase
+            .from('volunteers')
+            .select('*')
+            .order('status', { ascending: true }); // specific ordering if needed
 
         return { data: data || [], error };
     }
@@ -337,6 +353,37 @@ class SupabaseService {
             duracion_conversacion_minutos: durationConversation,
             created_at: dbSession.created_at
         };
+    }
+
+    // --- TOPIC METHODS ---
+
+    async getTopics(country?: string) {
+        let query = supabase.from('topics').select('*').eq('active', true);
+
+        if (country) {
+            query = query.or(`pais.eq.${country},pais.eq.Todos`);
+        } else {
+            query = query.eq('pais', 'Todos');
+        }
+
+        const { data, error } = await query.order('pais', { ascending: true });
+        return { data: data as Topic[] || [], error };
+    }
+
+    async getAllTopics() {
+        // For admin screen
+        const { data, error } = await supabase.from('topics').select('*').order('created_at', { ascending: false });
+        return { data: data as Topic[] || [], error };
+    }
+
+    async createTopic(topic: { pais: string; titulo: string }) {
+        const { data, error } = await supabase.from('topics').insert(topic).select().single();
+        return { data, error };
+    }
+
+    async deleteTopic(id: string) {
+        const { error } = await supabase.from('topics').delete().eq('id', id);
+        return { error };
     }
 }
 

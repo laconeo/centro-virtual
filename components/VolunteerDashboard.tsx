@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import { useLanguage } from '../src/contexts/LanguageContext';
-import { LogOut, FileSpreadsheet, Users, Video, MessageSquare, RefreshCw, Activity, Clock, CheckCircle, Play, Star, Calendar } from 'lucide-react';
+import { LogOut, FileSpreadsheet, Users, Video, MessageSquare, RefreshCw, Activity, Clock, CheckCircle, Play, Star, Calendar, Settings, Globe, Power } from 'lucide-react';
 import { Volunteer, UserSession, SatisfactionSurvey } from '../types';
 import { supabaseService } from '../services/supabaseService';
 import { initializeJitsi } from '../services/jitsi';
@@ -12,10 +12,11 @@ import { ChatRoom } from './ChatRoom';
 interface DashboardProps {
   volunteer: Volunteer;
   onLogout: () => void;
+  onConfigClick: () => void;
 }
 
-export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogout }) => {
-  const { t } = useLanguage();
+export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogout, onConfigClick }) => {
+  const { t, language, setLanguage, availableLanguages } = useLanguage();
   const [sessions, setSessions] = useState<UserSession[]>([]);
   const [surveys, setSurveys] = useState<SatisfactionSurvey[]>([]);
   const [activeSession, setActiveSession] = useState<UserSession | null>(null);
@@ -31,6 +32,7 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
   const [onlineVolunteers, setOnlineVolunteers] = useState<Volunteer[]>([]);
   const [onlineCount, setOnlineCount] = useState(1);
   const [isOnlineOpen, setIsOnlineOpen] = useState(false);
+  const [isLangOpen, setIsLangOpen] = useState(false);
 
   const fetchData = async () => {
     const sessionRes = await supabaseService.getSessions();
@@ -39,11 +41,11 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
     const surveyRes = await supabaseService.getSurveys();
     if (surveyRes.data) setSurveys(surveyRes.data as SatisfactionSurvey[]);
 
-    // Updated to get full list instead of just count
-    const volRes = await supabaseService.getOnlineVolunteers();
+    // Updated to get full list
+    const volRes = await supabaseService.getAllVolunteers();
     if (volRes.data) {
       setOnlineVolunteers(volRes.data as Volunteer[]);
-      setOnlineCount(volRes.data.length);
+      setOnlineCount(volRes.data.filter(v => v.status === 'online').length);
     }
   };
   const toggleStatus = async () => {
@@ -51,6 +53,12 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
     setCurrentStatus(newStatus);
     await supabaseService.updateVolunteerStatus(volunteer.id, newStatus);
     toast.success(t('dashboard_status_change').replace('{status}', newStatus === 'online' ? t('dashboard_available') : t('dashboard_busy')));
+    fetchData();
+  };
+
+  const forceOffline = async (volId: string) => {
+    await supabaseService.updateVolunteerStatus(volId, 'offline');
+    toast.success('Voluntario desconectado');
     fetchData();
   };
 
@@ -167,13 +175,21 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
       const surveyRes = await supabaseService.getSurveys();
       if (surveyRes.data) setSurveys(surveyRes.data as SatisfactionSurvey[]);
 
-      const countRes = await supabaseService.getOnlineVolunteersCount();
-      if (countRes.count !== null) setOnlineCount(countRes.count);
+      const volRes = await supabaseService.getAllVolunteers();
+      if (volRes.data) {
+        setOnlineVolunteers(volRes.data as Volunteer[]);
+        setOnlineCount(volRes.data.filter(v => v.status === 'online').length);
+      }
     }, 3000); // Polling every 3s
+
+    const handleBeforeUnload = () => {
+      supabaseService.updateVolunteerStatus(volunteer.id, 'offline');
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
       clearInterval(interval);
-      // Set offline on unmount (best effort)
+      window.removeEventListener('beforeunload', handleBeforeUnload);
       supabaseService.updateVolunteerStatus(volunteer.id, 'offline');
     };
   }, []);
@@ -359,12 +375,90 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
           </button>
         </div>
 
-        {/* Volunteers Online Count Badge */}
-        <div className="flex items-center gap-1 bg-blue-50 text-[var(--color-fs-blue)] px-2 py-1 rounded-full text-xs font-bold" title="Voluntarios conectados">
-          <Users className="w-3 h-3" />
-          <span>{onlineCount}</span>
+        {/* 1. Sesion Info (Volunteers Dropdown) */}
+        <div className="relative">
+          <button
+            onClick={() => setIsOnlineOpen(!isOnlineOpen)}
+            className="flex items-center gap-1 bg-blue-50 text-[var(--color-fs-blue)] px-2 py-1 rounded-full text-xs font-bold hover:bg-blue-100 transition-colors cursor-pointer"
+            title="Ver voluntarios"
+          >
+            <Users className="w-3 h-3" />
+            <span>{onlineCount}</span>
+          </button>
+
+          {isOnlineOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setIsOnlineOpen(false)}></div>
+              <div className="absolute right-0 mt-2 w-72 bg-white rounded-md shadow-lg py-2 z-20 border border-gray-100 max-h-96 overflow-y-auto">
+                <div className="px-4 py-2 border-b border-gray-100">
+                  <span className="text-xs font-bold text-gray-500 uppercase">Voluntarios ({onlineVolunteers.length})</span>
+                </div>
+                {onlineVolunteers.map(vol => (
+                  <div key={vol.id} className="px-4 py-3 hover:bg-gray-50 flex items-center justify-between border-b border-gray-50 last:border-0 group">
+                    <div className="flex items-start gap-3">
+                      <div className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${vol.status === 'online' ? 'bg-green-500' : vol.status === 'busy' ? 'bg-red-500' : 'bg-gray-300'}`} />
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-gray-800">{vol.nombre} {vol.id === volunteer.id && '(Tú)'}</span>
+                        <span className="text-xs text-gray-400">
+                          {vol.status === 'online' ? 'Online' : vol.status === 'busy' ? t('dashboard_status_busy') : 'Offline'}
+                          {vol.last_status_change && ` • ${new Date(vol.last_status_change).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`}
+                        </span>
+                      </div>
+                    </div>
+
+                    {vol.id !== volunteer.id && vol.status !== 'offline' && (
+                      <button
+                        onClick={() => forceOffline(vol.id)}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-red-500 p-1"
+                        title="Desconectar usuario (Forzar Offline)"
+                      >
+                        <Power className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
+        {/* 2. Config */}
+        <button onClick={onConfigClick} className="text-gray-500 hover:bg-gray-50 p-2 rounded-full transition-colors cursor-pointer" title="Configuración">
+          <Settings className="w-5 h-5" />
+        </button>
+
+        {/* 3. Language */}
+        <div className="relative">
+          <button
+            onClick={() => setIsLangOpen(!isLangOpen)}
+            className="p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600 flex items-center gap-1"
+            title="Cambiar idioma"
+          >
+            <Globe className="w-5 h-5" />
+            <span className="text-xs font-medium uppercase">{language}</span>
+          </button>
+          {isLangOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setIsLangOpen(false)}></div>
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-20 border border-gray-100">
+                {availableLanguages.map((lang) => (
+                  <button
+                    key={lang.code}
+                    onClick={() => {
+                      setLanguage(lang.code);
+                      setIsLangOpen(false);
+                    }}
+                    className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors ${language === lang.code ? 'text-[var(--color-primary)] font-semibold bg-blue-50' : 'text-gray-700'}`}
+                  >
+                    {lang.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* 4. Logout (Last) */}
         <button onClick={onLogout} className="text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors cursor-pointer" title="Salir">
           <LogOut className="w-5 h-5" />
         </button>

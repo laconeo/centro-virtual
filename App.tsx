@@ -4,10 +4,11 @@ import { User, HeartHandshake, Video, MessageSquare } from 'lucide-react';
 import { UserFlow } from './components/UserFlow';
 import { VolunteerLogin } from './components/VolunteerLogin';
 import { VolunteerDashboard } from './components/VolunteerDashboard';
+import { ConfigDashboard } from './components/ConfigDashboard';
 import { Volunteer } from './types';
 import { Layout } from './components/ui/Layout';
 
-type ViewState = 'home' | 'user-flow' | 'volunteer-login' | 'volunteer-dashboard';
+type ViewState = 'home' | 'user-flow' | 'volunteer-login' | 'volunteer-dashboard' | 'config';
 
 function App() {
   const [view, setView] = useState<ViewState>('home');
@@ -27,6 +28,8 @@ function App() {
     setView('volunteer-dashboard');
   };
 
+  const handleOpenConfig = () => setView('config');
+
   const handleVolunteerLogout = () => {
     setCurrentVolunteer(null);
     goHome();
@@ -45,7 +48,20 @@ function App() {
   if (view === 'volunteer-dashboard' && currentVolunteer) {
     return (
       <>
-        <VolunteerDashboard volunteer={currentVolunteer} onLogout={handleVolunteerLogout} />
+        <VolunteerDashboard
+          volunteer={currentVolunteer}
+          onLogout={handleVolunteerLogout}
+          onConfigClick={handleOpenConfig}
+        />
+        <Toaster position="top-right" />
+      </>
+    );
+  }
+
+  if (view === 'config') {
+    return (
+      <>
+        <ConfigDashboard onBack={currentVolunteer ? () => setView('volunteer-dashboard') : goHome} />
         <Toaster position="top-right" />
       </>
     );

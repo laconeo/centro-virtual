@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { useLanguage } from '../src/contexts/LanguageContext';
-import { Video, MessageSquare, Loader2 } from 'lucide-react';
+import { Video, MessageSquare, Loader2, X, FileText } from 'lucide-react';
 import { Layout } from './ui/Layout';
 import { UserSession } from '../types';
 import { supabaseService } from '../services/supabaseService';
-import { PAISES, TEMAS } from '../services/mockData';
+import { PAISES } from '../services/mockData';
 import { initializeJitsi } from '../services/jitsi';
 import { SatisfactionSurvey } from './SatisfactionSurvey';
 import { ChatRoom } from './ChatRoom';
@@ -24,6 +24,7 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
 
   const [mode, setMode] = useState<Mode>('video');
   const [sessionData, setSessionData] = useState<UserSession | null>(null);
+  const [showTerms, setShowTerms] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -37,6 +38,25 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
 
   // Call State
   const [jitsiApi, setJitsiApi] = useState<any>(null);
+
+  // Dynamic Topics
+  const [availableTopics, setAvailableTopics] = useState<string[]>([]);
+  const [loadingTopics, setLoadingTopics] = useState(false);
+
+  useEffect(() => {
+    const fetchTopics = async () => {
+      setLoadingTopics(true);
+      // If no country selected, just get Globals ('Todos') implicitly handled by service or empty check? 
+      // Service handles country param to get Global + Country. 
+      // If country is empty string, we might just want Global.
+      // But let's pass undefined if empty.
+      const countryParam = formData.pais || undefined;
+      const { data } = await supabaseService.getTopics(countryParam);
+      setAvailableTopics(data.map(t => t.titulo));
+      setLoadingTopics(false);
+    };
+    fetchTopics();
+  }, [formData.pais]);
 
   // Load saved user data
   useEffect(() => {
@@ -90,11 +110,16 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
     const { data, error } = await supabaseService.createSession({
       ...formData,
       sala_jitsi_id: slug,
-      type: mode
+      type: mode,
+      startWithAudioMuted: false, // FORCE AUDIO ON
+      startWithVideoMuted: false,
+      prejoinPageEnabled: false,
     });
 
     if (data) {
       setSessionData(data);
+      // Store session ID for recovery
+      localStorage.setItem('centro_virtual_active_session', JSON.stringify({ id: data.id }));
       setStep('waiting');
       toast.success(t('success_request'));
     } else {
@@ -146,9 +171,36 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
     };
   }, [step, sessionData, onExit]);
 
+  // Check for existing active session on mount
+  useEffect(() => {
+    const checkActiveSession = async () => {
+      const storedSession = localStorage.getItem('centro_virtual_active_session');
+      if (storedSession && step === 'selection') {
+        const { id } = JSON.parse(storedSession);
+        const { data } = await supabaseService.getSessionById(id);
+        if (data && data.estado === 'en_atencion') {
+          // Recover session
+          setSessionData(data);
+          const isChat = data.type === 'chat';
+          setMode(data.type);
+          setStep(isChat ? 'chat-active' : 'call');
+          toast.success('Sesión activa recuperada');
+        } else {
+          localStorage.removeItem('centro_virtual_active_session');
+        }
+      }
+    };
+    checkActiveSession();
+  }, []);
+
+  // 4. Handle User Exit (Chat or Video)
+
   // 4. Handle User Exit (Chat or Video)
   const handleUserExit = async () => {
     if (!sessionData) return;
+
+    // Clear local storage recovery
+    localStorage.removeItem('centro_virtual_active_session');
 
     // 1. Send notification message
     await supabaseService.sendMessage(sessionData.id, 'system', 'El usuario ha finalizado la sesión.');
@@ -241,9 +293,9 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
               {PAISES.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
 
-            <select required value={formData.tema} onChange={e => setFormData({ ...formData, tema: e.target.value })}>
-              <option value="">{t('form_topic_placeholder')}</option>
-              {TEMAS.map(t => <option key={t} value={t}>{t}</option>)}
+            <select required value={formData.tema} disabled={loadingTopics} onChange={e => setFormData({ ...formData, tema: e.target.value })}>
+              <option value="">{loadingTopics ? t('form_loading') || 'Cargando temas...' : t('form_topic_placeholder')}</option>
+              {availableTopics.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
 
             <input
@@ -261,12 +313,44 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
                 onChange={e => setFormData({ ...formData, terms: e.target.checked })}
               />
               <label htmlFor="terms" className="cursor-pointer">{t('form_terms')}</label>
+              <button
+                type="button"
+                onClick={() => setShowTerms(true)}
+                className="text-blue-500 hover:text-blue-700 underline flex items-center gap-1 ml-1"
+                title="Leer términos"
+              >
+                <FileText className="w-3 h-3" />
+                <span className="text-xs">{t('terms_link') || 'Leer'}</span>
+              </button>
             </div>
 
             <button type="submit" className="btn-primary w-full mt-4 cursor-pointer">
               {mode === 'video' ? t('btn_start_video') : t('btn_start_chat')}
             </button>
           </form>
+
+          {/* Terms Modal */}
+          {showTerms && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+              <div className="bg-white rounded-lg shadow-2xl w-full max-w-md overflow-hidden relative">
+                <div className="bg-[var(--color-primary)] text-white px-6 py-4 flex items-center justify-between">
+                  <h3 className="font-bold text-lg">{t('terms_modal_title') || 'Términos y Condiciones'}</h3>
+                  <button onClick={() => setShowTerms(false)} className="hover:bg-white/20 p-1 rounded-full transition-colors"><X className="w-5 h-5" /></button>
+                </div>
+                <div className="p-6 text-gray-700 text-sm leading-relaxed max-h-[60vh] overflow-y-auto">
+                  <p>{t('terms_modal_content')}</p>
+                </div>
+                <div className="px-6 py-4 bg-gray-50 flex justify-end">
+                  <button
+                    onClick={() => { setShowTerms(false); setFormData({ ...formData, terms: true }); }}
+                    className="bg-[var(--color-primary)] text-white px-4 py-2 rounded-md hover:bg-[var(--color-primary-700)] transition-colors text-sm font-medium"
+                  >
+                    {t('accept') || 'Aceptar'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </Layout>
     );

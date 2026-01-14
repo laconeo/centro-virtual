@@ -105,10 +105,12 @@ export const MOCK_SURVEYS: SatisfactionSurvey[] = [
 
 // Helpers for catalogs
 export const PAISES = [
-  'Argentina', 'Bolivia', 'Chile', 'Colombia', 'Costa Rica', 'Cuba',
-  'Ecuador', 'El Salvador', 'Guatemala', 'Honduras', 'México',
-  'Nicaragua', 'Panamá', 'Paraguay', 'Perú', 'Puerto Rico',
-  'República Dominicana', 'Uruguay', 'Venezuela'
+  'Antigua y Barbuda', 'Argentina', 'Bahamas', 'Barbados', 'Belice', 'Bolivia', 'Brasil',
+  'Chile', 'Colombia', 'Costa Rica', 'Cuba', 'Dominica', 'Ecuador', 'El Salvador',
+  'Granada', 'Guatemala', 'Guyana', 'Haití', 'Honduras', 'Jamaica', 'México',
+  'Nicaragua', 'Panamá', 'Paraguay', 'Perú', 'Puerto Rico', 'República Dominicana',
+  'San Cristóbal y Nieves', 'San Vicente y las Granadinas', 'Santa Lucía',
+  'Surinam', 'Trinidad y Tobago', 'Uruguay', 'Venezuela'
 ];
 
 export const TEMAS = [

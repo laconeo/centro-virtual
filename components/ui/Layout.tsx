@@ -33,46 +33,44 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onBac
           </div>
 
           <div className="flex items-center gap-3">
-            {rightContent && <div>{rightContent}</div>}
+            {rightContent ? (
+              rightContent
+            ) : (
+              <div className="relative">
+                <button
+                  onClick={() => setIsLangOpen(!isLangOpen)}
+                  className="p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600 flex items-center gap-1"
+                  title="Cambiar idioma"
+                >
+                  <Globe className="w-5 h-5" />
+                  <span className="text-xs font-medium uppercase">{language}</span>
+                </button>
 
-            {/* Language Switcher */}
-            <div className="relative">
-              <button
-                onClick={() => setIsLangOpen(!isLangOpen)}
-                className="p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-600 flex items-center gap-1"
-                title="Cambiar idioma"
-              >
-                <Globe className="w-5 h-5" />
-                <span className="text-xs font-medium uppercase">{language}</span>
-              </button>
-
-              {isLangOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-10"
-                    onClick={() => setIsLangOpen(false)}
-                  ></div>
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-20 border border-gray-100">
-                    {availableLanguages.map((lang) => (
-                      <button
-                        key={lang.code}
-                        onClick={() => {
-                          setLanguage(lang.code);
-                          setIsLangOpen(false);
-                        }}
-                        className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors ${language === lang.code ? 'text-[var(--color-primary)] font-semibold bg-blue-50' : 'text-gray-700'
-                          }`}
-                      >
-                        {lang.label}
-                      </button>
-                    ))}
-                    {availableLanguages.length === 0 && (
-                      <div className="px-4 py-2 text-sm text-gray-400">No languages found</div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
+                {isLangOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setIsLangOpen(false)}
+                    ></div>
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-20 border border-gray-100">
+                      {availableLanguages.map((lang) => (
+                        <button
+                          key={lang.code}
+                          onClick={() => {
+                            setLanguage(lang.code);
+                            setIsLangOpen(false);
+                          }}
+                          className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors ${language === lang.code ? 'text-[var(--color-primary)] font-semibold bg-blue-50' : 'text-gray-700'
+                            }`}
+                        >
+                          {lang.label}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </nav>
