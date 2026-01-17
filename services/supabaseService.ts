@@ -1,9 +1,65 @@
 import { supabase } from './supabaseClient';
 import { UserSession, Volunteer, SatisfactionSurvey, Message, Topic } from '../types';
+import emailjs from '@emailjs/browser';
 
 class SupabaseService {
 
     // --- SESSION METHODS ---
+
+    async checkAndNotifyVolunteers(sessionData: any) {
+        const { count } = await this.getOnlineVolunteersCount();
+
+        if (count === 0) {
+            console.log('No online volunteers found. Initiating volunteer notification protocol...');
+
+            // 1. Fetch volunteers with their roles
+            const { data: volunteers, error } = await supabase
+                .from('volunteers')
+                .select('email, nombre, role:roles(is_leader)')
+                .not('email', 'is', null);
+
+            if (error || !volunteers) {
+                console.error('Error fetching volunteer emails:', error);
+                return;
+            }
+
+            // Filter only leaders
+            const leaders = volunteers.filter((v: any) => v.role?.is_leader === true);
+            const emails = leaders.map((v: any) => v.email);
+
+            if (emails.length > 0) {
+                console.log(`Sending email alert via EmailJS to ${emails.length} leaders...`);
+
+                const serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+                const templateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
+                const publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
+
+                if (!serviceId || !templateId || !publicKey || serviceId === 'your_service_id') {
+                    console.warn('EmailJS not configured. Please set VITE_EMAILJS_SERVICE_ID, VITE_EMAILJS_TEMPLATE_ID, and VITE_EMAILJS_PUBLIC_KEY in .env');
+                    return;
+                }
+
+                const promises = emails.map((email: string) => {
+                    const templateParams = {
+                        to_email: email,
+                        user_name: `${sessionData.nombre} ${sessionData.apellido}`,
+                        user_country: sessionData.pais,
+                        user_topic: sessionData.tema,
+                        message: `El usuario está esperando en la sala virtual. Se requiere asistencia de un líder o voluntario disponible.`
+                    };
+
+                    return emailjs.send(serviceId, templateId, templateParams, publicKey)
+                        .then(() => console.log(`Email sent to ${email}`))
+                        .catch((err) => console.error(`Failed to send email to ${email}`, err));
+                });
+
+                await Promise.all(promises);
+
+            } else {
+                console.log('No leader emails found to notify.');
+            }
+        }
+    }
 
     async createSession(data: any) {
         // Sanitize input to remove 'terms' or any other non-DB fields
@@ -269,10 +325,45 @@ class SupabaseService {
         return { data: data || [], error };
     }
 
-    async getAllVolunteers() {
+    // --- ROLE METHODS ---
+
+    async getRoles() {
+        const { data, error } = await supabase.from('roles').select('*');
+        return { data: data as any[] || [], error };
+    }
+
+    async createRole(role: any) {
+        const { data, error } = await supabase.from('roles').insert(role).select().single();
+        return { data, error };
+    }
+
+    async updateRole(id: string, updates: any) {
+        const { data, error } = await supabase.from('roles').update(updates).eq('id', id).select().single();
+        return { data, error };
+    }
+
+    async deleteRole(id: string) {
+        const { error } = await supabase.from('roles').delete().eq('id', id);
+        return { error };
+    }
+
+    // --- VOLUNTEER (Admin) ---
+
+    async updateVolunteerRole(volunteerId: string, roleId: string) {
         const { data, error } = await supabase
             .from('volunteers')
-            .select('*')
+            .update({ role_id: roleId })
+            .eq('id', volunteerId)
+            .select()
+            .single();
+        return { data, error };
+    }
+
+    async getAllVolunteers() {
+        // Now fetching with roles
+        const { data, error } = await supabase
+            .from('volunteers')
+            .select('*, role:roles(*)')
             .order('status', { ascending: true }); // specific ordering if needed
 
         return { data: data || [], error };
@@ -385,6 +476,8 @@ class SupabaseService {
         const { error } = await supabase.from('topics').delete().eq('id', id);
         return { error };
     }
+
+
 }
 
 export const supabaseService = new SupabaseService();

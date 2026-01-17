@@ -190,9 +190,17 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
     return () => {
       clearInterval(interval);
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      supabaseService.updateVolunteerStatus(volunteer.id, 'offline');
+      // NOTE: We do NOT set offline here anymore, to avoid "flickering" to offline 
+      // when navigating to Config or during React StrictMode re-renders.
+      // Offline is now handled by 'beforeunload' (tab close) or manual Logout.
     };
   }, []);
+
+  const handleLogoutClick = async () => {
+    // Set offline explicitly when user clicks Logout
+    await supabaseService.updateVolunteerStatus(volunteer.id, 'offline');
+    onLogout();
+  };
 
   // ... (handleAttend and handleFinishSession activeSession logic unchanged) 
   const handleAttend = async (session: UserSession) => {
@@ -200,6 +208,10 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
 
     if (data) {
       setActiveSession(data);
+      // Auto-update status to busy
+      await supabaseService.updateVolunteerStatus(volunteer.id, 'busy');
+      setCurrentStatus('busy');
+
       if (data.type === 'video') {
         toast("Conectando videollamada...", { icon: 'video' });
       } else {
@@ -213,6 +225,11 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
   const handleFinishSession = async () => {
     if (!activeSession) return;
     await supabaseService.updateSessionStatus(activeSession.id, 'finalizado');
+
+    // Auto-update status back to online
+    await supabaseService.updateVolunteerStatus(volunteer.id, 'online');
+    setCurrentStatus('online');
+
     setActiveSession(null);
     toast.success("Sesión finalizada");
     fetchData();
@@ -267,7 +284,7 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
           Tema: s.tema,
           Canal: s.type,
           Estado: s.estado,
-          AtendidoPor: s.voluntario_id ? (s.voluntario_id === volunteer.id ? 'Mí' : 'Otro') : 'Nadie',
+          AtendidoPor: s.voluntario_id ? (s.voluntario_id === volunteer.id ? 'Mí' : (onlineVolunteers.find(v => v.id === s.voluntario_id)?.nombre || 'Otro')) : 'Nadie',
           Calificación: survey?.calificacion || 'N/A',
           Comentario: survey?.comentarios || ''
         };
@@ -459,7 +476,7 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
         </div>
 
         {/* 4. Logout (Last) */}
-        <button onClick={onLogout} className="text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors cursor-pointer" title="Salir">
+        <button onClick={handleLogoutClick} className="text-red-500 hover:bg-red-50 p-2 rounded-full transition-colors cursor-pointer" title="Salir">
           <LogOut className="w-5 h-5" />
         </button>
       </div>
@@ -609,14 +626,18 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <span className={`w-2 h-2 rounded-full ${isMine ? 'bg-[var(--color-fs-green)]' : 'bg-gray-300'}`}></span>
-                          <span className="text-gray-700 font-medium">{isMine ? t('dashboard_you') : t('dashboard_other_volunteer')}</span>
+                          <span className="text-gray-700 font-medium">{isMine ? t('dashboard_you') : (onlineVolunteers.find(v => v.id === s.voluntario_id)?.nombre || t('dashboard_other_volunteer'))}</span>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-right font-bold text-[var(--color-fs-green-dark)]">{activeDuration} min</td>
                       <td className="px-4 py-3 text-right">
                         {isMine ? (
                           <button
-                            onClick={() => setActiveSession(s)}
+                            onClick={() => {
+                              setActiveSession(s);
+                              supabaseService.updateVolunteerStatus(volunteer.id, 'busy');
+                              setCurrentStatus('busy');
+                            }}
                             className="text-[var(--color-fs-green)] hover:text-[var(--color-fs-green-dark)] font-bold text-xs uppercase cursor-pointer hover:underline flex items-center justify-end gap-1 w-full"
                           >
                             {t('dashboard_btn_resume')} <Play className="w-3 h-3" />
@@ -717,7 +738,9 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
                         </td>
                         <td className="px-4 py-3 text-gray-600">
                           {s.voluntario_id ? (
-                            s.voluntario_id === volunteer.id ? t('dashboard_you') : t('dashboard_other_volunteer')
+                            s.voluntario_id === volunteer.id
+                              ? t('dashboard_you')
+                              : (onlineVolunteers.find(v => v.id === s.voluntario_id)?.nombre || t('dashboard_other_volunteer'))
                           ) : '-'}
                         </td>
                         <td className="px-4 py-3 text-center">

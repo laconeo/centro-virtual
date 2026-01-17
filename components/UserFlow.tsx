@@ -120,6 +120,10 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
       setSessionData(data);
       // Store session ID for recovery
       localStorage.setItem('centro_virtual_active_session', JSON.stringify({ id: data.id }));
+
+      // Check for available volunteers and notify if none
+      supabaseService.checkAndNotifyVolunteers(data);
+
       setStep('waiting');
       toast.success(t('success_request'));
     } else {

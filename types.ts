@@ -25,10 +25,19 @@ export interface Message {
   timestamp: string;
 }
 
+export interface Role {
+  id: string;
+  name: string;
+  is_leader: boolean; // simple flag for now
+  description?: string;
+}
+
 export interface Volunteer {
   id: string; // UUID
   email: string;
   nombre: string;
+  role_id?: string; // Foreign key to Role
+  role?: Role; // Joined data
   status: 'online' | 'offline' | 'busy';
   last_status_change?: string; // ISO String
   created_at: string;
