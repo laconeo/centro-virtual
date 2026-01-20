@@ -414,7 +414,7 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ onClose }) =
                                     </div>
                                     <div className="h-20 w-px bg-gray-200"></div>
                                     <div className="text-center group">
-                                        <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3 text-[var(--color-fs-tree)] group-hover:bg-[var(--color-fs-tree)] group-hover:text-white transition-colors duration-300">
+                                        <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3 text-[#8CB83E] group-hover:bg-[#8CB83E] group-hover:text-white transition-colors duration-300">
                                             <MessageSquare className="w-8 h-8" />
                                         </div>
                                         <div className="text-3xl font-light text-[var(--color-fs-text)]">{byChannel['chat'] || 0}</div>
@@ -468,8 +468,8 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ onClose }) =
                                                                 </div>
                                                                 {/* Chat Bar */}
                                                                 <div
-                                                                    className="w-1/2 bg-[var(--color-fs-tree)] rounded-t-sm relative hover:bg-opacity-90 transition-all"
-                                                                    style={{ height: `${Math.max(chatH, 2)}%` }}
+                                                                    className="w-1/2 rounded-t-sm relative hover:bg-opacity-90 transition-all"
+                                                                    style={{ height: `${Math.max(chatH, 2)}%`, backgroundColor: '#8CB83E' }}
                                                                     title={`Chat: ${chat}`}
                                                                 >
                                                                     <div className="opacity-0 group-hover:opacity-100 absolute bottom-full left-1/2 -translate-x-1/2 mb-1 text-[10px] bg-gray-800 text-white px-1 py-0.5 rounded shadow-sm whitespace-nowrap z-20 pointer-events-none hidden md:block">
@@ -506,7 +506,7 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ onClose }) =
                                         <span className="w-3 h-3 rounded-sm bg-[var(--color-fs-blue)]"></span> Video
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <span className="w-3 h-3 rounded-sm bg-[var(--color-fs-tree)]"></span> Chat
+                                        <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#8CB83E' }}></span> Chat
                                     </div>
                                 </div>
                             </div>
