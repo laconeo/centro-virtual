@@ -2,12 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import { useLanguage } from '../src/contexts/LanguageContext';
-import { LogOut, FileSpreadsheet, Users, Video, MessageSquare, RefreshCw, Activity, Clock, CheckCircle, Play, Star, Calendar, Settings, Globe, Power } from 'lucide-react';
+import { LogOut, FileSpreadsheet, Users, Video, MessageSquare, RefreshCw, Activity, Clock, CheckCircle, Play, Star, Calendar, Settings, Globe, Power, BarChart2 } from 'lucide-react';
 import { Volunteer, UserSession, SatisfactionSurvey } from '../types';
 import { supabaseService } from '../services/supabaseService';
 import { initializeJitsi } from '../services/jitsi';
 import { Layout } from './ui/Layout';
 import { ChatRoom } from './ChatRoom';
+import { ReportsDashboard } from './ReportsDashboard';
+
 
 interface DashboardProps {
   volunteer: Volunteer;
@@ -33,6 +35,8 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
   const [onlineCount, setOnlineCount] = useState(1);
   const [isOnlineOpen, setIsOnlineOpen] = useState(false);
   const [isLangOpen, setIsLangOpen] = useState(false);
+  const [isReportsOpen, setIsReportsOpen] = useState(false);
+
 
   const fetchData = async () => {
     const sessionRes = await supabaseService.getSessions();
@@ -444,6 +448,16 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
           <Settings className="w-5 h-5" />
         </button>
 
+        {/* 2.1 Reports */}
+        <button
+          onClick={() => setIsReportsOpen(true)}
+          className="text-gray-500 hover:bg-gray-50 p-2 rounded-full transition-colors cursor-pointer"
+          title="Ver Reportes y Estadísticas"
+        >
+          <BarChart2 className="w-5 h-5" />
+        </button>
+
+
         {/* 3. Language */}
         <div className="relative">
           <button
@@ -801,6 +815,12 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
           </div>
         </div>
       )}
+
+      {/* Reports Modal */}
+      {isReportsOpen && (
+        <ReportsDashboard onClose={() => setIsReportsOpen(false)} />
+      )}
+
     </Layout>
   );
 };

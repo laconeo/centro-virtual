@@ -104,6 +104,32 @@ class SupabaseService {
         return { data: data.map(this.mapSession), error: null };
     }
 
+    async getReportData(startDate?: string, endDate?: string) {
+        let query = supabase
+            .from('sessions')
+            .select('*')
+            .order('fecha_ingreso', { ascending: false });
+
+        if (startDate) {
+            query = query.gte('fecha_ingreso', startDate);
+        }
+        if (endDate) {
+            // Add one day to end date to include the full day
+            const nextDay = new Date(endDate);
+            nextDay.setDate(nextDay.getDate() + 1);
+            query = query.lt('fecha_ingreso', nextDay.toISOString());
+        }
+
+        const { data, error } = await query;
+
+        if (error) {
+            console.error('Error fetching report data:', error);
+            return { data: [], error };
+        }
+
+        return { data: data.map(this.mapSession), error: null };
+    }
+
     async getSessionById(id: string) {
         const { data, error } = await supabase
             .from('sessions')
