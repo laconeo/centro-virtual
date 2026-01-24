@@ -1,7 +1,7 @@
 {
     "language": "K'iche'",
     "app_title": "Centro Virtual",
-    "footer_text": "© 2026 Tob'anelab' rech FS",
+    "footer_text": "© 2026 B'anom ruk' ❤️ rech ya'ik tob'anem che le wokisanel",
     "footer_volunteer_access": "Okem kech Tob'anelab'",
     "welcome_title": "¿Jas xawaj kat-ch'aw quk'?",
     "video_call": "Tzijonem rik'il wachib'al",
@@ -22,7 +22,7 @@
     "form_terms": "Kink'ul na",
     "terms_link": "Sik'ij u'nik'wach",
     "terms_modal_title": "U'nik'wach",
-    "terms_modal_content": "Wa' we tob'anem man k'o ta rajil xuquje' kato'ik kumal tob'anelab'. We tob'anelab' man ke'ok ta chech FamilySearch. Are taq kakokisaj we tob'anem, man k'o ta umak we tob'anelab' chech utzij.",
+    "terms_modal_content": "Esta aplicación es una demostración preliminar del modelo de Centro Virtual de FamilySearch para Latinoamérica. Su único objetivo es evaluar la viabilidad operativa y funcional del servicio y recopilar observaciones para la toma de decisiones.\n\nNo reemplaza ni modifica sistemas oficiales de FamilySearch, no accede a información sensible ni compromete la seguridad, la marca o los datos de la organización. Su uso está enfocado exclusivamente en miembros de la Iglesia y en un contexto de prueba controlada, previo a una eventual implementación en una plataforma oficialmente aprobada.",
     "accept": "Kink'ul na",
     "btn_start_video": "Majij Tzijonem",
     "btn_start_chat": "Okem pa Tzijonem",

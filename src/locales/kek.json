@@ -1,7 +1,7 @@
 {
     "language": "Q'eqchi'",
     "app_title": "Centro Virtual",
-    "footer_text": "© 2026 Ajsilol Tenq' cho'q reheb' li aj oksihel re FS",
+    "footer_text": "© 2026 Yiib'anb'il rik'in ❤️ re xk'eeb'al tenq'ankil li aj oksihel",
     "footer_volunteer_access": "Okwuj reheb' li Misioner",
     "welcome_title": "Chan ru taawaj aatinak qik'in?",
     "video_call": "Aatinak sa' Video",
@@ -22,7 +22,7 @@
     "form_terms": "Nink'ulub'a li aatin",
     "terms_link": "Il li aatin re lehink",
     "terms_modal_title": "Aatin re lehink",
-    "terms_modal_content": "Li tenq'ank a'in maatan ha naxb'aanuheb' li aj tenq'anel. Eb' li tenq'anel moko re ta FamilySearch. Naq nakawoksi li tenq'ank a'in, nakawosob'tesi eb' li aj tenq'anel chirix li na'leb' neke'xye.",
+    "terms_modal_content": "Esta aplicación es una demostración preliminar del modelo de Centro Virtual de FamilySearch para Latinoamérica. Su único objetivo es evaluar la viabilidad operativa y funcional del servicio y recopilar observaciones para la toma de decisiones.\n\nNo reemplaza ni modifica sistemas oficiales de FamilySearch, no accede a información sensible ni compromete la seguridad, la marca o los datos de la organización. Su uso está enfocado exclusivamente en miembros de la Iglesia y en un contexto de prueba controlada, previo a una eventual implementación en una plataforma oficialmente aprobada.",
     "accept": "K'ulub'ank",
     "btn_start_video": "Tikib' Aatinak",
     "btn_start_chat": "Ok sa' Chat",

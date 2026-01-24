@@ -12,6 +12,13 @@
   --color-fs-tree: #8CB83E;
   --color-fs-tree-dark: #6ca030;
 
+  /* Primary Color Shades */
+  --color-primary-50: #f4f8eb;
+  --color-primary-100: #e8f1d8;
+  --color-primary-600: #739634;
+  --color-primary-700: #5b7528;
+  --color-primary-800: #42551d;
+
   --color-fs-blue: #005994;
   --color-fs-blue-hover: #004a7c;
 
@@ -116,7 +123,7 @@ textarea:focus {
 }
 
 .btn-primary:hover {
-  background-color: var(--color-primary-600);
+  background-color: var(--color-primary-hover);
 }
 
 .btn-primary:disabled {

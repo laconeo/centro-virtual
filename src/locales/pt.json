@@ -1,7 +1,7 @@
 {
     "language": "Português",
     "app_title": "Centro Virtual",
-    "footer_text": "© 2026 Serviços de apoio para usuários de FS",
+    "footer_text": "© 2026 Feito com ❤️ para prover apoio ao usuário",
     "footer_volunteer_access": "Acesso missionários de serviço",
     "welcome_title": "Como você gostaria de se comunicar conosco?",
     "video_call": "Videochamada",
@@ -22,7 +22,7 @@
     "form_terms": "Aceito os termos e condições",
     "terms_link": "Ler termos",
     "terms_modal_title": "Termos e Condições",
-    "terms_modal_content": "Este serviço é gratuito e é atendido por voluntários. Os voluntários não representam as opiniões oficiais do FamilySearch. Ao usar este serviço, você isenta os voluntários de responsabilidade por qualquer sugestão ou assistência fornecida.",
+    "terms_modal_content": "Esta aplicação é uma demonstração preliminar do modelo de Centro Virtual do FamilySearch para a América Latina. Seu único objetivo é avaliar a viabilidade operacional e funcional do serviço e coletar observações para a tomada de decisões.\n\nNão substitui nem modifica sistemas oficiais do FamilySearch, não acessa informações sensíveis nem compromete a segurança, a marca ou os dados da organização. Seu uso é focado exclusivamente em membros da Igreja e em um contexto de teste controlado, antes de uma eventual implementação em uma plataforma oficialmente aprovada.",
     "accept": "Aceitar",
     "btn_start_video": "Iniciar Conversa",
     "btn_start_chat": "Entrar no Chat",
