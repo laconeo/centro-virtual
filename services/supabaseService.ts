@@ -89,15 +89,36 @@ class SupabaseService {
         return { data: this.mapSession(session), error: null };
     }
 
-    async getSessions() {
-        const { data, error } = await supabase
+    async getSessions(activeOnly: boolean = false) {
+        let query = supabase
             .from('sessions')
-            .select('*')
-            .in('estado', ['esperando', 'en_atencion', 'abandonado', 'finalizado'])
-            .order('fecha_ingreso', { ascending: true }); // Oldest first for queue
+            .select('*');
+
+        if (activeOnly) {
+            query = query.in('estado', ['esperando', 'en_atencion']);
+        } else {
+            query = query.in('estado', ['esperando', 'en_atencion', 'abandonado', 'finalizado']);
+        }
+
+        const { data, error } = await query.order('fecha_ingreso', { ascending: true }); // Oldest first for queue
 
         if (error) {
             console.error('Error fetching sessions:', error);
+            return { data: [], error };
+        }
+
+        return { data: data.map(this.mapSession), error: null };
+    }
+
+    async getHistory() {
+        const { data, error } = await supabase
+            .from('sessions')
+            .select('*')
+            .in('estado', ['abandonado', 'finalizado'])
+            .order('fecha_ingreso', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching history:', error);
             return { data: [], error };
         }
 

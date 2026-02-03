@@ -19,7 +19,10 @@ interface DashboardProps {
 
 export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogout, onConfigClick }) => {
   const { t, language, setLanguage, availableLanguages } = useLanguage();
-  const [sessions, setSessions] = useState<UserSession[]>([]);
+  const [activeSessions, setActiveSessions] = useState<UserSession[]>([]);
+  const [historySessions, setHistorySessions] = useState<UserSession[]>([]);
+  // Combined for existing logic compatibility, though we could refactor downstream
+  const sessions = [...activeSessions, ...historySessions];
   const [surveys, setSurveys] = useState<SatisfactionSurvey[]>([]);
   const [activeSession, setActiveSession] = useState<UserSession | null>(null);
   const [selectedComment, setSelectedComment] = useState<string | null>(null);
@@ -39,8 +42,13 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
 
 
   const fetchData = async () => {
-    const sessionRes = await supabaseService.getSessions();
-    if (sessionRes.data) setSessions(sessionRes.data as UserSession[]);
+    // Fetch Active
+    const activeRes = await supabaseService.getSessions(true);
+    if (activeRes.data) setActiveSessions(activeRes.data as UserSession[]);
+
+    // Fetch History
+    const historyRes = await supabaseService.getHistory();
+    if (historyRes.data) setHistorySessions(historyRes.data as UserSession[]);
 
     const surveyRes = await supabaseService.getSurveys();
     if (surveyRes.data) setSurveys(surveyRes.data as SatisfactionSurvey[]);
@@ -168,17 +176,31 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
     // Set status to online on mount
     supabaseService.updateVolunteerStatus(volunteer.id, 'online');
 
+    // Counter for slower polling
+    let tickCount = 0;
+
     const interval = setInterval(async () => {
-      const sessionRes = await supabaseService.getSessions();
+      tickCount++;
+
+      // Poll ACTIVE sessions (Fast: 3s)
+      const sessionRes = await supabaseService.getSessions(true);
       if (sessionRes.data) {
         const data = sessionRes.data as UserSession[];
-        setSessions(data);
+        setActiveSessions(data);
         handleAlerts(data);
       }
 
-      const surveyRes = await supabaseService.getSurveys();
-      if (surveyRes.data) setSurveys(surveyRes.data as SatisfactionSurvey[]);
+      // Poll Surveys & History (Slow: every 30s - 10 ticks)
+      if (tickCount % 10 === 0) {
+        const surveyRes = await supabaseService.getSurveys();
+        if (surveyRes.data) setSurveys(surveyRes.data as SatisfactionSurvey[]);
 
+        // Optional: Poll history too if we want to see other people's finished sessions eventually
+        // const histRes = await supabaseService.getHistory();
+        // if (histRes.data) setHistorySessions(histRes.data as UserSession[]);
+      }
+
+      // Poll Volunteers (Fast-ish: 3s) - Needed for 'Online' status accuracy
       const volRes = await supabaseService.getAllVolunteers();
       if (volRes.data) {
         setOnlineVolunteers(volRes.data as Volunteer[]);
