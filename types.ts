@@ -4,6 +4,7 @@ export interface UserSession {
   apellido: string;
   email?: string;
   pais: string;
+  idioma?: string; // Idioma preferido del usuario (es, pt, fr, gn)
   tema: string;
   fecha_ingreso: string; // ISO String
   fecha_atencion?: string; // ISO String - When volunteer started help
@@ -14,6 +15,7 @@ export interface UserSession {
   estado: 'esperando' | 'en_atencion' | 'finalizado' | 'no_atendido' | 'abandonado';
   type: 'video' | 'chat';
   voluntario_id?: string;
+  voluntario_nombre?: string; // Nombre del voluntario que atiende
   created_at: string;
 }
 
@@ -23,6 +25,7 @@ export interface Message {
   sender: 'user' | 'volunteer' | 'system';
   text: string;
   timestamp: string;
+  volunteer_id?: string; // ID del voluntario que envió el mensaje (si sender === 'volunteer')
 }
 
 export interface Role {

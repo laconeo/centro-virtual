@@ -35,7 +35,14 @@ export const VolunteerLogin: React.FC<LoginProps> = ({ onLoginSuccess, onBack })
       toast.success(t('welcome_user').replace('{name}', data.nombre));
       onLoginSuccess(data);
     } else {
-      toast.error(error || "Error al iniciar sesión");
+      // Check if error is about email not confirmed
+      const errorMsg = error || "";
+      if (errorMsg.toLowerCase().includes('email not confirmed') ||
+        errorMsg.toLowerCase().includes('not confirmed')) {
+        toast.error(t('error_email_not_confirmed') || "Su email no ha sido confirmado aún. Por favor, vaya a su correo electrónico para confirmar su cuenta.");
+      } else {
+        toast.error(errorMsg || "Error al iniciar sesión");
+      }
     }
   };
 

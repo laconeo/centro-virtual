@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient';
 import { UserSession, Volunteer, SatisfactionSurvey, Message, Topic } from '../types';
 import emailjs from '@emailjs/browser';
+import { cacheService } from './cacheService';
 
 class SupabaseService {
 
@@ -72,6 +73,7 @@ class SupabaseService {
                 apellido: cleanData.apellido,
                 email: cleanData.email,
                 pais: cleanData.pais,
+                idioma: cleanData.idioma,
                 tema: cleanData.tema,
                 sala_jitsi_id: cleanData.sala_jitsi_id,
                 type: cleanData.type,
@@ -86,13 +88,19 @@ class SupabaseService {
             return { data: null, error };
         }
 
+        // OPTIMIZATION: Run notification check asynchronously (don't await)
+        // This prevents blocking the user's session creation
+        this.checkAndNotifyVolunteers(session).catch(err =>
+            console.error('Error in background notification:', err)
+        );
+
         return { data: this.mapSession(session), error: null };
     }
 
     async getSessions(activeOnly: boolean = false) {
         let query = supabase
             .from('sessions')
-            .select('*');
+            .select('*, volunteer:volunteers(nombre)');
 
         if (activeOnly) {
             query = query.in('estado', ['esperando', 'en_atencion']);
@@ -154,7 +162,7 @@ class SupabaseService {
     async getSessionById(id: string) {
         const { data, error } = await supabase
             .from('sessions')
-            .select('*')
+            .select('*, volunteer:volunteers(nombre)')
             .eq('id', id)
             .single();
 
@@ -201,20 +209,28 @@ class SupabaseService {
                 sessionId: m.session_id,
                 sender: m.sender,
                 text: m.text,
-                timestamp: m.created_at
+                timestamp: m.created_at,
+                volunteer_id: m.volunteer_id
             })),
             error: null
         };
     }
 
-    async sendMessage(sessionId: string, sender: string, text: string) {
+    async sendMessage(sessionId: string, sender: string, text: string, volunteerId?: string) {
+        const messageData: any = {
+            session_id: sessionId,
+            sender,
+            text
+        };
+
+        // Si es un voluntario, guardar su ID
+        if (sender === 'volunteer' && volunteerId) {
+            messageData.volunteer_id = volunteerId;
+        }
+
         const { data, error } = await supabase
             .from('messages')
-            .insert({
-                session_id: sessionId,
-                sender,
-                text
-            })
+            .insert(messageData)
             .select()
             .single();
 
@@ -226,7 +242,8 @@ class SupabaseService {
                 sessionId: data.session_id,
                 sender: data.sender,
                 text: data.text,
-                timestamp: data.created_at
+                timestamp: data.created_at,
+                volunteer_id: data.volunteer_id
             },
             error: null
         };
@@ -268,7 +285,11 @@ class SupabaseService {
                 .single();
             volunteer = newVol;
         } else {
-            await this.updateVolunteerStatus(volunteer.id, 'online');
+            // OPTIMIZATION: Update status asynchronously (don't await)
+            // This makes login faster - status will update in background
+            this.updateVolunteerStatus(volunteer.id, 'online').catch(err =>
+                console.error('Error updating volunteer status:', err)
+            );
         }
 
         return { data: { ...volunteer, status: 'online' }, error: null };
@@ -407,11 +428,21 @@ class SupabaseService {
     }
 
     async getAllVolunteers() {
+        // OPTIMIZATION: Check cache first
+        const cacheKey = 'all_volunteers';
+        const cachedData = cacheService.get<any[]>(cacheKey);
+        if (cachedData) return { data: cachedData, error: null };
+
         // Now fetching with roles
         const { data, error } = await supabase
             .from('volunteers')
             .select('*, role:roles(*)')
             .order('status', { ascending: true }); // specific ordering if needed
+
+        if (data && !error) {
+            // Cache for 2 minutes - volunteers status changes relatively often but names don't
+            cacheService.set(cacheKey, data, 2 * 60 * 1000);
+        }
 
         return { data: data || [], error };
     }
@@ -479,11 +510,13 @@ class SupabaseService {
             apellido: dbSession.apellido,
             email: dbSession.email,
             pais: dbSession.pais,
+            idioma: dbSession.idioma,
             tema: dbSession.tema,
             estado: dbSession.estado,
             type: dbSession.type as 'video' | 'chat',
             sala_jitsi_id: dbSession.sala_jitsi_id,
             voluntario_id: dbSession.voluntario_id,
+            voluntario_nombre: dbSession.volunteer?.nombre, // Extract volunteer name from JOIN
             fecha_ingreso: dbSession.fecha_ingreso,
             fecha_atencion: dbSession.fecha_atencion,
             fecha_fin: dbSession.fecha_fin,
@@ -496,6 +529,14 @@ class SupabaseService {
     // --- TOPIC METHODS ---
 
     async getTopics(country?: string) {
+        // OPTIMIZATION: Use cache to avoid repeated DB queries
+        const cacheKey = `topics:${country || 'all'}`;
+        const cached = cacheService.get<Topic[]>(cacheKey);
+
+        if (cached) {
+            return { data: cached, error: null };
+        }
+
         let query = supabase.from('topics').select('*').eq('active', true);
 
         if (country) {
@@ -505,6 +546,12 @@ class SupabaseService {
         }
 
         const { data, error } = await query.order('pais', { ascending: true });
+
+        if (data && !error) {
+            // Cache for 5 minutes
+            cacheService.set(cacheKey, data as Topic[], 5 * 60 * 1000);
+        }
+
         return { data: data as Topic[] || [], error };
     }
 
@@ -516,11 +563,23 @@ class SupabaseService {
 
     async createTopic(topic: { pais: string; titulo: string }) {
         const { data, error } = await supabase.from('topics').insert(topic).select().single();
+
+        // Invalidate cache when topics are modified
+        if (!error) {
+            cacheService.invalidatePattern('topics:');
+        }
+
         return { data, error };
     }
 
     async deleteTopic(id: string) {
         const { error } = await supabase.from('topics').delete().eq('id', id);
+
+        // Invalidate cache when topics are modified
+        if (!error) {
+            cacheService.invalidatePattern('topics:');
+        }
+
         return { error };
     }
 

@@ -76,6 +76,7 @@
     "btn_send_link": "Enlaceta kachay",
     "btn_sending": "Kachachkan...",
     "welcome_user": "Allinmi hamurqanki, {name}",
+    "error_email_not_confirmed": "Su email no ha sido confirmado aún. Por favor, vaya a su correo electrónico para confirmar su cuenta.",
     "logout_success": "Sesion wisq'asqa",
     "dashboard_status_change": "Kayman tikrasqa: {status}",
     "dashboard_available": "Kachkanmi",

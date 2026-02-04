@@ -76,6 +76,7 @@
     "btn_send_link": "Manda Link",
     "btn_sending": "Mandando...",
     "welcome_user": "Bon bini, {name}",
+    "error_email_not_confirmed": "Su email no ha sido confirmado aún. Por favor, vaya a su correo electrónico para confirmar su cuenta.",
     "logout_success": "Seshon serÃ¡",
     "dashboard_status_change": "Status kambiÃ¡ pa {status}",
     "dashboard_available": "Disponibel",

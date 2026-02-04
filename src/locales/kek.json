@@ -76,6 +76,7 @@
     "btn_send_link": "Taqla li Link",
     "btn_sending": "Yook chi taqlank...",
     "welcome_user": "Sahil ch'oolej, {name}",
+    "error_email_not_confirmed": "Su email no ha sido confirmado aún. Por favor, vaya a su correo electrónico para confirmar su cuenta.",
     "logout_success": "Xtzap li okem",
     "dashboard_status_change": "Xjalaak xwankil sa' {status}",
     "dashboard_available": "Sik'b'il",

@@ -76,6 +76,7 @@
     "btn_send_link": "Taqaj Kematz'ib'",
     "btn_sending": "Ktaqik...",
     "welcome_user": "Utz ipetik, {name}",
+    "error_email_not_confirmed": "Su email no ha sido confirmado aún. Por favor, vaya a su correo electrónico para confirmar su cuenta.",
     "logout_success": "Xtz'apix okem",
     "dashboard_status_change": "Xk'ex u'wÃ¤ch pa {status}",
     "dashboard_available": "K'olik",

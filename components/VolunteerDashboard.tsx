@@ -186,7 +186,11 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
       const sessionRes = await supabaseService.getSessions(true);
       if (sessionRes.data) {
         const data = sessionRes.data as UserSession[];
-        setActiveSessions(data);
+        setActiveSessions(prev => {
+          // Simple string comparison to avoid re-render if data is identical
+          if (JSON.stringify(prev) === JSON.stringify(data)) return prev;
+          return data;
+        });
         handleAlerts(data);
       }
 
@@ -203,8 +207,12 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
       // Poll Volunteers (Fast-ish: 3s) - Needed for 'Online' status accuracy
       const volRes = await supabaseService.getAllVolunteers();
       if (volRes.data) {
-        setOnlineVolunteers(volRes.data as Volunteer[]);
-        setOnlineCount(volRes.data.filter(v => v.status === 'online').length);
+        const data = volRes.data as Volunteer[];
+        setOnlineVolunteers(prev => {
+          if (JSON.stringify(prev) === JSON.stringify(data)) return prev;
+          return data;
+        });
+        setOnlineCount(data.filter(v => v.status === 'online').length);
       }
     }, 3000); // Polling every 3s
 
@@ -394,7 +402,19 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
           <div id="dashboard-jitsi" className="flex-1 w-full bg-black"></div>
         ) : (
           <div className="flex-1 bg-gray-100 p-4">
-            <ChatRoom session={activeSession} currentUser="volunteer" />
+            <ChatRoom
+              session={activeSession}
+              currentUser="volunteer"
+              currentVolunteerId={volunteer.id}
+              onExit={() => {
+                // Solo salir del chat, no finalizar la sesión
+                setActiveSession(null);
+                supabaseService.updateVolunteerStatus(volunteer.id, 'online');
+                setCurrentStatus('online');
+                toast('Has salido del chat', { icon: '👋' });
+              }}
+              onEndSession={handleFinishSession}
+            />
           </div>
         )}
       </div>
@@ -563,6 +583,7 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
                     <th className="px-4 py-3 font-medium">{t('dashboard_col_country')}</th>
                     <th className="px-4 py-3 font-medium">{t('dashboard_col_topic')}</th>
                     <th className="px-4 py-3 font-medium">{t('dashboard_col_channel')}</th>
+                    <th className="px-4 py-3 font-medium">{t('dashboard_col_language')}</th>
                     <th className="px-4 py-3 font-medium text-right">{t('dashboard_stats_waiting')}</th>
                     <th className="px-4 py-3 font-medium text-right">{t('dashboard_col_actions')}</th>
                   </tr>
@@ -592,6 +613,11 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${s.type === 'video' ? 'bg-blue-50 text-[var(--color-fs-blue)]' : 'bg-gray-100 text-gray-700'}`}>
                             {s.type === 'video' ? <Video className="w-3 h-3" /> : <MessageSquare className="w-3 h-3" />}
                             {s.type === 'video' ? 'Video' : 'Chat'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-amber-50 text-amber-700 border border-amber-100 uppercase">
+                            {s.idioma || 'ES'}
                           </span>
                         </td>
                         <td className={`px-4 py-3 text-right font-bold ${isPriority ? 'text-[var(--color-fs-green-dark)]' : 'text-gray-700'} ${waitMinutes >= 1 ? 'text-red-600 animate-pulse' : ''}`}>
@@ -637,6 +663,7 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
                   <th className="px-4 py-3">{t('dashboard_col_name')}</th>
                   <th className="px-4 py-3">{t('dashboard_col_topic')}</th>
                   <th className="px-4 py-3">{t('dashboard_col_channel')}</th>
+                  <th className="px-4 py-3">{t('dashboard_col_language')}</th>
                   <th className="px-4 py-3">Atendido Por</th>
                   <th className="px-4 py-3 text-right">Tiempo Activo</th>
                   <th className="px-4 py-3 text-right">{t('dashboard_col_actions')}</th>
@@ -657,6 +684,11 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${s.type === 'video' ? 'bg-blue-50 text-[var(--color-fs-blue)]' : 'bg-gray-100 text-gray-700'}`}>
                           {s.type === 'video' ? <Video className="w-3 h-3" /> : <MessageSquare className="w-3 h-3" />}
                           {s.type === 'video' ? 'Video' : 'Chat'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-amber-50 text-amber-700 border border-amber-100 uppercase">
+                          {s.idioma || 'ES'}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -740,6 +772,7 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
                     <th className="px-4 py-3">País</th>
                     <th className="px-4 py-3">Tema</th>
                     <th className="px-4 py-3">Canal</th>
+                    <th className="px-4 py-3">Idioma</th>
                     <th className="px-4 py-3 text-center">Espera</th>
                     <th className="px-4 py-3 text-center">Duración</th>
                     <th className="px-4 py-3">Atendido Por</th>
@@ -760,6 +793,11 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${s.type === 'video' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
                             {s.type === 'video' ? <Video className="w-3 h-3" /> : <MessageSquare className="w-3 h-3" />}
                             {s.type === 'video' ? 'Video' : 'Chat'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-amber-50 text-amber-700 border border-amber-100 uppercase">
+                            {s.idioma || 'ES'}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-center text-gray-600">

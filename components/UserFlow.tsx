@@ -19,7 +19,7 @@ type Step = 'selection' | 'form' | 'waiting' | 'call' | 'chat-active' | 'feedbac
 type Mode = 'video' | 'chat';
 
 export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [step, setStep] = useState<Step>('selection');
 
   const [mode, setMode] = useState<Mode>('video');
@@ -43,13 +43,10 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
   const [availableTopics, setAvailableTopics] = useState<string[]>([]);
   const [loadingTopics, setLoadingTopics] = useState(false);
 
+  // OPTIMIZATION: Preload global topics on mount, then reload when country changes
   useEffect(() => {
     const fetchTopics = async () => {
       setLoadingTopics(true);
-      // If no country selected, just get Globals ('Todos') implicitly handled by service or empty check? 
-      // Service handles country param to get Global + Country. 
-      // If country is empty string, we might just want Global.
-      // But let's pass undefined if empty.
       const countryParam = formData.pais || undefined;
       const { data } = await supabaseService.getTopics(countryParam);
       setAvailableTopics(data.map(t => t.titulo));
@@ -109,6 +106,7 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
     // Create session in DB
     const { data, error } = await supabaseService.createSession({
       ...formData,
+      idioma: language,
       sala_jitsi_id: slug,
       type: mode,
       startWithAudioMuted: false, // FORCE AUDIO ON
@@ -121,8 +119,7 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
       // Store session ID for recovery
       localStorage.setItem('centro_virtual_active_session', JSON.stringify({ id: data.id }));
 
-      // Check for available volunteers and notify if none
-      supabaseService.checkAndNotifyVolunteers(data);
+      // OPTIMIZATION: Notification is now handled asynchronously in createSession service
 
       setStep('waiting');
       toast.success(t('success_request'));
@@ -386,7 +383,7 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
           <ChatRoom
             session={sessionData}
             currentUser="user"
-            onExit={handleUserExit}
+            onEndSession={handleUserExit}
           />
         </div>
       </div>
