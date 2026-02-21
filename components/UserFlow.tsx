@@ -39,7 +39,6 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
   });
   const [sessionData, setSessionData] = useState<UserSession | null>(null);
   const [showTerms, setShowTerms] = useState(false);
-  const [showExtensionInfo, setShowExtensionInfo] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -281,27 +280,27 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
           </div>
 
           <div className="max-w-2xl mx-auto mt-8 px-4">
-            <button
-              onClick={() => setShowExtensionInfo(true)}
-              className="w-full bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl p-4 flex flex-col md:flex-row items-center gap-4 transition-all hover:shadow-md cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-blue-300 group"
+            <a
+              href={`${import.meta.env.BASE_URL}?extension=true`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block w-full bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl p-4 transition-all hover:shadow-md cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-blue-300 group"
             >
-              <div className="bg-white p-3 rounded-full shadow-sm text-[var(--color-fs-blue)] group-hover:scale-110 transition-transform">
-                <Puzzle className="w-6 h-6" />
+              <div className="flex flex-col md:flex-row items-center gap-4">
+                <div className="bg-white p-3 rounded-full shadow-sm text-[var(--color-fs-blue)] group-hover:scale-110 transition-transform">
+                  <Puzzle className="w-6 h-6" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-bold text-[var(--color-fs-blue)] text-sm md:text-base">{t('ext_banner_title') || '¿Sabías que puedes pedir ayuda sin salir de tu página?'}</h3>
+                  <p className="text-xs md:text-sm text-gray-600 mt-1">
+                    {t('ext_banner_desc') || 'Instala el Centro Virtual en tu computadora y podrás recibir ayuda en tiempo real desde cualquier sitio de FamilySearch.'}
+                    <span className="font-medium text-blue-600 ml-1">{t('ext_banner_link') || 'Ver detalles'} &rarr;</span>
+                  </p>
+                </div>
               </div>
-              <div className="flex-1">
-                <h3 className="font-bold text-[var(--color-fs-blue)] text-sm md:text-base">{t('ext_banner_title') || '¿Sabías que puedes pedir ayuda sin salir de tu página?'}</h3>
-                <p className="text-xs md:text-sm text-gray-600 mt-1">
-                  {t('ext_banner_desc') || 'Instala el Centro Virtual en tu computadora y podrás recibir ayuda en tiempo real desde cualquier sitio de FamilySearch.'}
-                  <span className="font-medium text-blue-600 ml-1">{t('ext_banner_link') || 'Ver detalles'} &rarr;</span>
-                </p>
-              </div>
-            </button>
+            </a>
           </div>
         </div>
-
-        {showExtensionInfo && (
-          <UserExtensionInfo onClose={() => setShowExtensionInfo(false)} />
-        )}
       </Layout>
     );
   }

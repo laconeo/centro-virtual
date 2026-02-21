@@ -9,9 +9,10 @@ interface LayoutProps {
   onBack?: () => void;
   onVolunteerClick?: () => void;
   rightContent?: React.ReactNode;
+  fullWidth?: boolean;
 }
 
-export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onBack, onVolunteerClick, rightContent }) => {
+export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onBack, onVolunteerClick, rightContent, fullWidth }) => {
   const { language, setLanguage, availableLanguages, t } = useLanguage();
   const [isLangOpen, setIsLangOpen] = useState(false);
 
@@ -76,7 +77,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, title, showBack, onBac
       </nav>
 
       {/* Content */}
-      <main className="w-full max-w-5xl px-4 py-8 flex-1">
+      <main className={`w-full flex-1 ${fullWidth ? '' : 'max-w-5xl px-4 py-8'}`}>
         {children}
       </main>
 

@@ -8,8 +8,9 @@ import { ConfigDashboard } from './components/ConfigDashboard';
 import { Volunteer } from './types';
 import { Layout } from './components/ui/Layout';
 import { supabaseService } from './services/supabaseService';
+import { UserLandingExtension } from './components/UserLandingExtension';
 
-type ViewState = 'home' | 'user-flow' | 'volunteer-login' | 'volunteer-dashboard' | 'config';
+type ViewState = 'home' | 'user-flow' | 'volunteer-login' | 'volunteer-dashboard' | 'config' | 'extension-landing';
 
 function App() {
   const [view, setView] = useState<ViewState>('home');
@@ -29,6 +30,8 @@ function App() {
         } else {
           setView('volunteer-login');
         }
+      } else if (url.searchParams.has('extension')) {
+        setView('extension-landing');
       }
     };
     initRoute();
@@ -81,6 +84,15 @@ function App() {
     return (
       <>
         <ConfigDashboard onBack={currentVolunteer ? () => setView('volunteer-dashboard') : goHome} />
+        <Toaster position="top-right" />
+      </>
+    );
+  }
+
+  if (view === 'extension-landing') {
+    return (
+      <>
+        <UserLandingExtension />
         <Toaster position="top-right" />
       </>
     );
