@@ -46,7 +46,12 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ session, currentUser, onExit
 
     // Scroll to bottom on new messages
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        if (messagesContainerRef.current) {
+            messagesContainerRef.current.scrollTo({
+                top: messagesContainerRef.current.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
     }, [messages]);
 
     // Fetch volunteer names for messages
@@ -86,8 +91,9 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ session, currentUser, onExit
             // When keyboard opens, scroll to bottom to keep input visible
             if (document.activeElement === inputRef.current) {
                 setTimeout(() => {
-                    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-                    inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    if (messagesContainerRef.current) {
+                        messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+                    }
                 }, 100);
             }
         };
@@ -95,8 +101,9 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ session, currentUser, onExit
         const handleFocus = () => {
             // Ensure input stays visible when focused
             setTimeout(() => {
-                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-                inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                if (messagesContainerRef.current) {
+                    messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+                }
             }, 300); // Delay to allow keyboard animation
         };
 

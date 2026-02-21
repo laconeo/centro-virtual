@@ -31,9 +31,13 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [statusFilter, setStatusFilter] = useState<'all' | 'finalizado' | 'abandonado'>('all');
   const [filterMode, setFilterMode] = useState<'all' | 'waiting' | 'active' | 'video' | 'chat'>(() => {
-    const p = window.location.pathname;
-    if (p.includes('/video')) return 'video';
-    if (p.includes('/chat')) return 'chat';
+    const url = new URL(window.location.href);
+    const p = url.pathname;
+    const atender = url.searchParams.get('atender');
+    const modeStr = p.includes('/video') ? 'video' : p.includes('/chat') ? 'chat' : atender;
+
+    if (modeStr === 'video') return 'video';
+    if (modeStr === 'chat') return 'chat';
     return 'all';
   });
 
@@ -263,10 +267,18 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
 
   useEffect(() => {
     const initDeepLink = async () => {
-      const path = window.location.pathname;
-      const parts = path.split('/').filter(Boolean);
+      const url = new URL(window.location.href);
+      const parts = url.pathname.split('/').filter(Boolean);
+      const atenderQ = url.searchParams.get('atender');
+
+      let sId = null;
       if (parts[0] === 'atender' && parts[1] && parts[1] !== 'video' && parts[1] !== 'chat') {
-        const sId = parts[1];
+        sId = parts[1];
+      } else if (atenderQ && atenderQ !== 'video' && atenderQ !== 'chat') {
+        sId = atenderQ;
+      }
+
+      if (sId) {
         const res = await supabaseService.getSessionById(sId);
         if (res.data) {
           if (res.data.estado === 'esperando') {

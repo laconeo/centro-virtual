@@ -19,8 +19,9 @@ function App() {
   // Router init
   React.useEffect(() => {
     const initRoute = async () => {
-      const path = window.location.pathname;
-      if (path.startsWith('/atender')) {
+      const url = new URL(window.location.href);
+      // Suport subpath and query parameters since GH pages fails with subpaths without 404.html
+      if (url.pathname.includes('/atender') || url.searchParams.has('atender')) {
         const vol = await supabaseService.getCurrentVolunteer();
         if (vol) {
           setCurrentVolunteer(vol);

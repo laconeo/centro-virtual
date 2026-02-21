@@ -126,11 +126,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const BASE_URL = isDev ? 'http://localhost:3000' : 'https://laconeo.github.io/centro-virtual';
 
     document.getElementById('btn-open-chat').addEventListener('click', () => {
-        chrome.tabs.create({ url: `${BASE_URL}/atender/chat` });
+        chrome.tabs.create({ url: `${BASE_URL}/?atender=chat` });
+        window.close();
     });
 
     document.getElementById('btn-open-video').addEventListener('click', () => {
-        chrome.tabs.create({ url: `${BASE_URL}/atender/video` });
+        chrome.tabs.create({ url: `${BASE_URL}/?atender=video` });
+        window.close();
     });
 
     document.getElementById('btn-logout').addEventListener('click', async () => {
