@@ -9,35 +9,56 @@
 
 <body>
   <div class="header">
-    <img src="icons/icon64.png" alt="FamilySearch" class="logo" />
-    <div class="header-text">
-      <span class="brand">Centro Virtual</span>
-      <span class="brand-sub">FamilySearch</span>
+    <div class="header-left">
+      <img src="icons/icon64.png" alt="FamilySearch" class="logo" />
+      <div class="header-text">
+        <span class="brand" data-i18n="ext_user_title">Centro Virtual</span>
+        <span class="brand-sub" data-i18n="ext_user_sub">FamilySearch</span>
+      </div>
+    </div>
+    <select id="lang-selector" class="lang-select">
+      <option value="es">Español</option>
+      <option value="pt">Português</option>
+      <option value="fr">Français</option>
+    </select>
+  </div>
+
+  <div class="queues">
+    <div class="queue-card video-card" id="btn-video">
+      <div class="queue-icon-wrapper">
+        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"></path>
+          <rect x="2" y="6" width="14" height="12" rx="2"></rect>
+        </svg>
+      </div>
+      <div class="queue-info">
+        <span class="queue-title" data-i18n="ext_user_video">Videollamada</span>
+        <div class="badge-label">
+          <span class="waiting-text" data-i18n="ext_user_video_sub">Nueva pestaña</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="queue-card chat-card" id="btn-chat">
+      <div class="queue-icon-wrapper">
+        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+      </div>
+      <div class="queue-info">
+        <span class="queue-title" data-i18n="ext_user_chat">Chat Flotante</span>
+        <div class="badge-label">
+          <span class="waiting-text" data-i18n="ext_user_chat_sub">En esta página</span>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div class="menu-buttons">
-    <button id="btn-plan" class="btn-menu">
-      <span class="btn-icon">📅</span>
-      <div class="btn-label">
-        <strong>Planificar Actividad</strong>
-        <small>Agenda con tu grupo</small>
-      </div>
-      <span class="btn-arrow">›</span>
-    </button>
+  <p class="footer-note" data-i18n="ext_user_footer">Sigue navegando mientras conversas</p>
 
-    <button id="btn-chat" class="btn-menu btn-menu-primary">
-      <span class="btn-icon">💬</span>
-      <div class="btn-label">
-        <strong>Chatear con un Voluntario</strong>
-        <small>Se abre flotante mientras navegas</small>
-      </div>
-      <span class="btn-arrow">›</span>
-    </button>
-  </div>
-
-  <p class="footer-note">Sigue navegando mientras conversas</p>
-
+  <script src="i18n.js"></script>
   <script src="popup.js"></script>
 </body>
 

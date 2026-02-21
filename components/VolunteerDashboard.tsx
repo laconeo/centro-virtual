@@ -30,7 +30,12 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
   // Date and Status Filter
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [statusFilter, setStatusFilter] = useState<'all' | 'finalizado' | 'abandonado'>('all');
-  const [filterMode, setFilterMode] = useState<'all' | 'waiting' | 'active' | 'video' | 'chat'>('all');
+  const [filterMode, setFilterMode] = useState<'all' | 'waiting' | 'active' | 'video' | 'chat'>(() => {
+    const p = window.location.pathname;
+    if (p.includes('/video')) return 'video';
+    if (p.includes('/chat')) return 'chat';
+    return 'all';
+  });
 
   // Status State
   const [currentStatus, setCurrentStatus] = useState<'online' | 'busy' | 'offline'>('online');
@@ -255,6 +260,34 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
       toast.error("Error al atender la sesión");
     }
   };
+
+  useEffect(() => {
+    const initDeepLink = async () => {
+      const path = window.location.pathname;
+      const parts = path.split('/').filter(Boolean);
+      if (parts[0] === 'atender' && parts[1] && parts[1] !== 'video' && parts[1] !== 'chat') {
+        const sId = parts[1];
+        const res = await supabaseService.getSessionById(sId);
+        if (res.data) {
+          if (res.data.estado === 'esperando') {
+            handleAttend(res.data);
+          } else if (res.data.estado === 'en_atencion' && res.data.voluntario_id === volunteer.id) {
+            setActiveSession(res.data);
+            supabaseService.updateVolunteerStatus(volunteer.id, 'busy');
+            setCurrentStatus('busy');
+          } else if (res.data.estado === 'en_atencion') {
+            toast.error("Esta sesión ya está siendo atendida por otro voluntario.");
+          } else {
+            toast.error("Esta sesión ya no está disponible (" + res.data.estado + ").");
+          }
+        }
+        window.history.replaceState({}, '', '/');
+      } else if (parts[0] === 'atender' && (parts[1] === 'chat' || parts[1] === 'video')) {
+        window.history.replaceState({}, '', '/');
+      }
+    };
+    initDeepLink();
+  }, []);
 
   const handleFinishSession = async () => {
     if (!activeSession) return;

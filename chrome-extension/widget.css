@@ -63,19 +63,19 @@
     display: none;
     width: 64px;
     height: 64px;
-    background: #8CB83E;
+    background: #005994;
     border-radius: 50%;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     position: relative;
-    box-shadow: 0 8px 24px rgba(140, 184, 62, 0.5);
+    box-shadow: 0 8px 24px rgba(0, 89, 148, 0.4);
     transition: transform 0.2s, background-color 0.2s;
 }
 
 #fs-bubble:hover {
     transform: scale(1.08);
-    background: #739634;
+    background: #004a7c;
 }
 
 .fs-bubble-icon {
@@ -94,14 +94,14 @@
     border: 2px solid #fff;
 }
 
-/* ══════════════════ HEADER — Verde FamilySearch ══════════════════ */
+/* ══════════════════ HEADER — Azul FamilySearch ══════════════════ */
 #fs-wh {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 18px 20px;
-    background: #8CB83E;
-    /* Verde hoja FamilySearch */
+    background: #005994;
+    /* Azul FamilySearch */
     flex-shrink: 0;
 }
 
@@ -324,7 +324,7 @@
 
 .fs-wait-card {
     background: #fff;
-    border-left: 4px solid #8CB83E;
+    border-left: 4px solid #005994;
     border-radius: 4px;
     padding: 32px 28px;
     display: flex;
@@ -339,7 +339,7 @@
     width: 48px;
     height: 48px;
     border: 3px solid #e0e0e0;
-    border-top: 3px solid #8CB83E;
+    border-top: 3px solid #005994;
     border-radius: 50%;
     animation: fs-spin 0.9s linear infinite;
 }
@@ -486,7 +486,7 @@
 .fs-dot {
     width: 10px;
     height: 10px;
-    background: #8CB83E;
+    background: #005994;
     border-radius: 50%;
     animation: fs-pulse 2s infinite;
 }
@@ -582,7 +582,7 @@
 .fs-send-btn {
     width: 44px;
     height: 44px;
-    background: #8CB83E;
+    background: #005994;
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -593,7 +593,7 @@
 }
 
 .fs-send-btn:hover {
-    background: #739634;
+    background: #004a7c;
     transform: scale(1.06);
 }
 
@@ -658,8 +658,8 @@
 }
 
 #fs-feedback-text:focus {
-    border-color: #8CB83E;
-    box-shadow: 0 0 0 3px rgba(140, 184, 62, 0.12);
+    border-color: #005994;
+    box-shadow: 0 0 0 3px rgba(0, 89, 148, 0.12);
 }
 
 .fs-skip-btn {

@@ -1,7 +1,40 @@
 // popup.js
 
-document.getElementById('btn-plan').addEventListener('click', () => {
-    chrome.tabs.create({ url: 'https://familysearch.me/DD' });
+const isDev = false; // Cambiar a false en prod
+const BASE_URL = isDev ? 'http://localhost:3000' : 'https://laconeo.github.io/centro-virtual';
+
+// Translate texts based on language
+function applyTranslations(lang) {
+    const dict = EXTN_LOCALES[lang] || EXTN_LOCALES['es'];
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (dict[key]) {
+            el.textContent = dict[key];
+        }
+    });
+
+    // Save choice
+    chrome.storage.local.set({ userLang: lang });
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    const langSelect = document.getElementById('lang-selector');
+
+    // Load saved lang or fallback
+    const { userLang } = await chrome.storage.local.get('userLang');
+    const currentLang = userLang || 'es';
+    langSelect.value = currentLang;
+    applyTranslations(currentLang);
+
+    // Watch for change
+    langSelect.addEventListener('change', (e) => {
+        applyTranslations(e.target.value);
+    });
+});
+
+
+document.getElementById('btn-video').addEventListener('click', () => {
+    chrome.tabs.create({ url: `${BASE_URL}/?mode=video` });
     window.close();
 });
 

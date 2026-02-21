@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { useLanguage } from '../src/contexts/LanguageContext';
-import { Video, MessageSquare, Loader2, X, FileText, PhoneCall, Mail } from 'lucide-react';
+import { Video, MessageSquare, Loader2, X, FileText, PhoneCall, Mail, Puzzle } from 'lucide-react';
 
 const WHATSAPP_EMERGENCY_URL = 'https://chat.whatsapp.com/DGAXFWucF8w5NmQc21UGrl';
 import { Layout } from './ui/Layout';
@@ -11,6 +11,7 @@ import { PAISES } from '../services/mockData';
 import { initializeJitsi } from '../services/jitsi';
 import { SatisfactionSurvey } from './SatisfactionSurvey';
 import { ChatRoom } from './ChatRoom';
+import { UserExtensionInfo } from './UserExtensionInfo';
 
 interface UserFlowProps {
   onExit: () => void;
@@ -22,11 +23,23 @@ type Mode = 'video' | 'chat';
 
 export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess }) => {
   const { t, language } = useLanguage();
-  const [step, setStep] = useState<Step>('selection');
+  const [step, setStep] = useState<Step>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('mode') ? 'form' : 'selection';
+  });
 
-  const [mode, setMode] = useState<Mode>('video');
+  const [mode, setMode] = useState<Mode>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const modeParam = params.get('mode');
+    if (modeParam === 'video' || modeParam === 'chat') {
+      window.history.replaceState({}, '', '/'); // Cleanup URL
+      return modeParam as Mode;
+    }
+    return 'video';
+  });
   const [sessionData, setSessionData] = useState<UserSession | null>(null);
   const [showTerms, setShowTerms] = useState(false);
+  const [showExtensionInfo, setShowExtensionInfo] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -266,7 +279,29 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
               )}
             </button>
           </div>
+
+          <div className="max-w-2xl mx-auto mt-8 px-4">
+            <button
+              onClick={() => setShowExtensionInfo(true)}
+              className="w-full bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl p-4 flex flex-col md:flex-row items-center gap-4 transition-all hover:shadow-md cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-blue-300 group"
+            >
+              <div className="bg-white p-3 rounded-full shadow-sm text-[var(--color-fs-blue)] group-hover:scale-110 transition-transform">
+                <Puzzle className="w-6 h-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-[var(--color-fs-blue)] text-sm md:text-base">{t('ext_banner_title') || '¿Sabías que puedes pedir ayuda sin salir de tu página?'}</h3>
+                <p className="text-xs md:text-sm text-gray-600 mt-1">
+                  {t('ext_banner_desc') || 'Instala el Centro Virtual en tu computadora y podrás recibir ayuda en tiempo real desde cualquier sitio de FamilySearch.'}
+                  <span className="font-medium text-blue-600 ml-1">{t('ext_banner_link') || 'Ver detalles'} &rarr;</span>
+                </p>
+              </div>
+            </button>
+          </div>
         </div>
+
+        {showExtensionInfo && (
+          <UserExtensionInfo onClose={() => setShowExtensionInfo(false)} />
+        )}
       </Layout>
     );
   }

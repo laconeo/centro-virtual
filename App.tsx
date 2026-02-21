@@ -7,6 +7,7 @@ import { VolunteerDashboard } from './components/VolunteerDashboard';
 import { ConfigDashboard } from './components/ConfigDashboard';
 import { Volunteer } from './types';
 import { Layout } from './components/ui/Layout';
+import { supabaseService } from './services/supabaseService';
 
 type ViewState = 'home' | 'user-flow' | 'volunteer-login' | 'volunteer-dashboard' | 'config';
 
@@ -14,6 +15,23 @@ function App() {
   const [view, setView] = useState<ViewState>('home');
   const [currentVolunteer, setCurrentVolunteer] = useState<Volunteer | null>(null);
   const [userFlowKey, setUserFlowKey] = useState(0);
+
+  // Router init
+  React.useEffect(() => {
+    const initRoute = async () => {
+      const path = window.location.pathname;
+      if (path.startsWith('/atender')) {
+        const vol = await supabaseService.getCurrentVolunteer();
+        if (vol) {
+          setCurrentVolunteer(vol);
+          setView('volunteer-dashboard');
+        } else {
+          setView('volunteer-login');
+        }
+      }
+    };
+    initRoute();
+  }, []);
 
   // Navigation handlers
   const goHome = () => {

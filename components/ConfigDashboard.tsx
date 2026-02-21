@@ -3,12 +3,14 @@ import { ArrowLeft, MessageSquare, Users, Shield, Grid, ChevronRight } from 'luc
 import { TopicManagement } from './TopicManagement';
 import { VolunteerManagement } from './VolunteerManagement';
 import { RoleManagement } from './RoleManagement';
+import { MissionaryExtensionInfo } from './MissionaryExtensionInfo';
+import { BellRing } from 'lucide-react';
 
 interface ConfigDashboardProps {
     onBack: () => void;
 }
 
-type ConfigView = 'menu' | 'topics' | 'volunteers' | 'roles';
+type ConfigView = 'menu' | 'topics' | 'volunteers' | 'roles' | 'extension';
 
 export const ConfigDashboard: React.FC<ConfigDashboardProps> = ({ onBack }) => {
     const [view, setView] = useState<ConfigView>('menu');
@@ -40,6 +42,15 @@ export const ConfigDashboard: React.FC<ConfigDashboardProps> = ({ onBack }) => {
             bgColor: 'bg-white',
             borderColor: 'border-l-4 border-[#575757]',
             action: () => setView('roles')
+        },
+        {
+            id: 'extension',
+            label: 'Extensión Misionero',
+            desc: 'Servicio en segundo plano y notificaciones push.',
+            icon: <BellRing className="w-8 h-8 text-amber-500" />,
+            bgColor: 'bg-white',
+            borderColor: 'border-l-4 border-amber-500',
+            action: () => setView('extension')
         }
     ];
 
@@ -74,6 +85,8 @@ export const ConfigDashboard: React.FC<ConfigDashboardProps> = ({ onBack }) => {
                 return <div className="p-6"><VolunteerManagement /></div>;
             case 'roles':
                 return <div className="p-6"><RoleManagement /></div>;
+            case 'extension':
+                return <div className="p-6"><MissionaryExtensionInfo /></div>;
             default:
                 return (
                     <div className="p-6 md:p-10 animate-fade-in max-w-6xl mx-auto w-full">
@@ -118,7 +131,8 @@ export const ConfigDashboard: React.FC<ConfigDashboardProps> = ({ onBack }) => {
                 {renderHeader(
                     view === 'menu' ? 'Configuración del Sistema' :
                         view === 'topics' ? 'Gestión de Temas' :
-                            view === 'volunteers' ? 'Directorio de Voluntarios' : 'Roles y Permisos',
+                            view === 'volunteers' ? 'Directorio de Voluntarios' :
+                                view === 'roles' ? 'Roles y Permisos' : 'Extensión del Misionero',
                     view === 'menu' ? 'Selecciona un módulo para administrar' : undefined
                 )}
 

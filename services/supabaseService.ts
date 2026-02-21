@@ -253,6 +253,28 @@ class SupabaseService {
 
     // --- AUTH METHODS (Real Supabase Auth) ---
 
+    async getCurrentVolunteer() {
+        // Obtenemos la sesión asíncrona real en lugar de getSession para evitar bugs
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error || !session) return null;
+
+        const { data: volunteer } = await supabase
+            .from('volunteers')
+            .select('*')
+            .eq('email', session.user.email)
+            .single();
+
+        if (volunteer) {
+            // Check if status is offline and update if needed, or just return as online
+            if (volunteer.status === 'offline') {
+                await this.updateVolunteerStatus(volunteer.id, 'online');
+                volunteer.status = 'online';
+            }
+            return volunteer;
+        }
+        return null;
+    }
+
     async login(email: string, password?: string) {
         if (!password) return { data: null, error: 'Se requiere contraseña' };
 
