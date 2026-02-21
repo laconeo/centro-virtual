@@ -65,13 +65,13 @@ export const MissionaryExtensionInfo: React.FC = () => {
                 </div>
 
                 <div className="mt-8 flex justify-center">
-                    <button
-                        className="bg-[#005994] hover:bg-[#004a7c] text-white px-6 py-3 rounded-md font-bold flex items-center gap-2 transition-colors transition-shadow shadow-md hover:shadow-lg"
-                        onClick={() => window.alert("Aquí los administradores alojarían el .zip para que los misioneros lo descarguen directamente.")}
+                    <a
+                        className="bg-[#005994] hover:bg-[#004a7c] text-white px-6 py-3 rounded-md font-bold flex items-center gap-2 transition-colors transition-shadow shadow-md hover:shadow-lg inline-flex"
+                        href="/ext-misionero-prod.zip" download="ext-misionero-prod.zip"
                     >
                         <Download className="w-5 h-5" />
                         Descargar Archivo de Extensión
-                    </button>
+                    </a>
                 </div>
 
             </div>

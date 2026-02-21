@@ -76,12 +76,12 @@ export const UserExtensionInfo: React.FC<UserExtensionInfoProps> = ({ onClose })
                             </ol>
 
                             <div className="mt-6 pt-6 border-t border-gray-200">
-                                <button
-                                    onClick={() => alert("Acá se adjuntará el enlace directo para descargar el .zip de la extensión del usuario.")}
+                                <a
+                                    href="/ext-usuario-prod.zip" download="ext-usuario-prod.zip"
                                     className="w-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-700)] text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-md hover:shadow-lg"
                                 >
                                     <Download className="w-5 h-5" /> {t('ext_modal_download_btn') || 'Descargar Extensión'}
-                                </button>
+                                </a>
                             </div>
                         </div>
                     </div>
