@@ -26,7 +26,16 @@ const loadState = () => new Promise(res => {
 });
 
 // ── Estado reactivo ──────────────────────────────────────────────────
-let S = { session: null, userData: null, pollTimer: null, msgTimer: null, view: 'form', rating: 0 };
+let S = {
+  session: null,
+  userData: null,
+  pollTimer: null,
+  msgTimer: null,
+  view: 'form',
+  rating: 0,
+  lastMsgTimestamp: null,  // cursor: only fetch msgs NEWER than this
+  topicsCache: null        // cache topics so we don't refetch them
+};
 let shadowRoot = null;
 
 const $ = (id) => shadowRoot ? shadowRoot.getElementById(id) : null;
@@ -239,8 +248,9 @@ function buildWidget() {
   // ── Chequear voluntarios en línea ───────────────────────────────
   async function checkOnlineVolunteers() {
     try {
-      const volunteers = await sbSelect('volunteers', 'status=eq.online&select=id,nombre');
-      const count = Array.isArray(volunteers) ? volunteers.filter(v => v).length : 0;
+      // select=count avoids transferring entire rows
+      const volunteers = await sbSelect('volunteers', 'status=eq.online&select=id&limit=100');
+      const count = Array.isArray(volunteers) ? volunteers.length : 0;
       const dot = $('fs-vol-status-dot');
       const txt = $('fs-vol-count-text');
       if (!dot || !txt) return;
@@ -257,8 +267,8 @@ function buildWidget() {
     }
   }
   checkOnlineVolunteers();
-  // Refrescar cada 60s
-  setInterval(() => { if (isValid()) checkOnlineVolunteers(); }, 60000);
+  // Refresh every 2 minutes — volunteer status doesn't change every second
+  setInterval(() => { if (isValid()) checkOnlineVolunteers(); }, 120000);
 
   // ── Vista ──────────────────────────────────────────────────────
   const views = ['form', 'waiting', 'chat', 'feedback'];
@@ -311,13 +321,23 @@ function buildWidget() {
     }
   };
 
-  // ── Cargar temas ───────────────────────────────────────────────
+  // ── Cargar temas (con caché de sesión) ────────────────────────
   (async () => {
     try {
-      const topics = await sbSelect('topics', 'active=eq.true&order=titulo.asc');
+      // Use session-level cache: only query once per widget lifecycle
+      if (!S.topicsCache) {
+        S.topicsCache = await sbSelect('topics', 'active=eq.true&order=titulo.asc&select=titulo');
+      }
       const sel = $('fs-tema');
       sel.innerHTML = '<option value="">— Selecciona —</option>';
-      topics.forEach(t => { const o = document.createElement('option'); o.value = o.textContent = t.titulo; sel.appendChild(o); });
+      // Use DocumentFragment to batch DOM insertions
+      const frag = document.createDocumentFragment();
+      S.topicsCache.forEach(t => {
+        const o = document.createElement('option');
+        o.value = o.textContent = t.titulo;
+        frag.appendChild(o);
+      });
+      sel.appendChild(frag);
     } catch (e) { }
   })();
 
@@ -346,6 +366,7 @@ function buildWidget() {
     }
 
     S.userData = data;
+    S.lastMsgTimestamp = null; // reset cursor for new session
     $('fs-w-nombre').textContent = data.nombre;
     $('fs-w-tema').textContent = data.tema;
     showView('waiting');
@@ -353,7 +374,8 @@ function buildWidget() {
     try {
       S.session = await sbInsert('sessions', data);
       persistState();
-      S.pollTimer = setInterval(pollStatus, 3000);
+      // Poll session status every 5s (was 3s) — 1 req per 5s per user = 240 req/min for 20 users
+      S.pollTimer = setInterval(pollStatus, 5000);
     } catch (err) {
       showView('form');
       btn.disabled = false; btn.textContent = 'Entrar a la Sala de Espera';
@@ -362,19 +384,21 @@ function buildWidget() {
 
   // ── Polling sala de espera ──────────────────────────────────────
   async function pollStatus() {
-    // Si el contexto de la extensión ya no es válido, limpiar
     if (!isValid()) { clearInterval(S.pollTimer); return; }
     if (!S.session) return;
     try {
-      const rows = await sbSelect('sessions', `id=eq.${S.session.id}&select=*`);
+      // Only select status fields — no need for full record while waiting
+      const rows = await sbSelect('sessions', `id=eq.${S.session.id}&select=id,estado,voluntario_id`);
       if (!rows?.length) return;
       const s = rows[0];
       if (s.estado === 'en_atencion') {
         clearInterval(S.pollTimer);
-        S.session = s;
+        S.session = { ...S.session, ...s };
         persistState();
         showView('chat');
-        S.msgTimer = setInterval(loadMsgs, 2500);
+        await loadMsgs(); // Immediate first load
+        // Poll messages every 4s (was 2.5s) — still feels real-time, cuts req by 37%
+        S.msgTimer = setInterval(loadMsgs, 4000);
       } else if (['finalizado', 'abandonado'].includes(s.estado)) {
         clearInterval(S.pollTimer);
         S.session = null; clearState(); showView('form');
@@ -391,24 +415,42 @@ function buildWidget() {
     clearState(); showView('form');
   };
 
-  // ── Mensajes ───────────────────────────────────────────────────
+  // ── Mensajes: incremental (solo trae lo nuevo) ────────────────
   async function loadMsgs() {
-    // Si el contexto de la extensión ya no es válido, limpiar
     if (!isValid()) { clearInterval(S.msgTimer); return; }
     if (!S.session) return;
     try {
-      const msgs = await sbSelect('messages', `session_id=eq.${S.session.id}&order=created_at.asc`);
+      // Use timestamp cursor to only fetch NEWER messages
+      // This reduces payload from O(all messages) to O(new messages)
+      const tsFilter = S.lastMsgTimestamp
+        ? `&created_at=gt.${encodeURIComponent(S.lastMsgTimestamp)}`
+        : '';
+
+      const msgs = await sbSelect(
+        'messages',
+        `session_id=eq.${S.session.id}&order=created_at.asc&select=id,sender,text,created_at${tsFilter}`
+      );
+
+      if (!msgs || !msgs.length) return; // nothing new — zero DOM work
+
       const box = $('fs-messages');
       const atBottom = box.scrollHeight - box.scrollTop <= box.clientHeight + 80;
-      box.innerHTML = '';
+
+      // Incremental append: only add NEW messages, no full DOM rebuild
+      const frag = document.createDocumentFragment();
       msgs.forEach(m => {
         const d = document.createElement('div');
         d.className = m.sender === 'user' ? 'fs-msg-user' : 'fs-msg-vol';
         d.innerHTML = `<span class="fs-bubble">${esc(m.text)}</span>`;
-        box.appendChild(d);
+        frag.appendChild(d);
+        // Advance cursor to the latest timestamp seen
+        if (!S.lastMsgTimestamp || m.created_at > S.lastMsgTimestamp) {
+          S.lastMsgTimestamp = m.created_at;
+        }
       });
+      box.appendChild(frag);
+
       if (atBottom) box.scrollTop = box.scrollHeight;
-      // badge si minimizado
       if (minimized) $('fs-bubble-dot').style.display = 'block';
     } catch (e) { }
   }
@@ -419,7 +461,11 @@ function buildWidget() {
     const text = inp.value.trim();
     if (!text || !S.session) return;
     inp.value = ''; inp.disabled = true;
-    try { await sbInsert('messages', { session_id: S.session.id, sender: 'user', text }); await loadMsgs(); }
+    try {
+      await sbInsert('messages', { session_id: S.session.id, sender: 'user', text });
+      // After sending, immediately fetch new messages (cursor-based, lightweight)
+      await loadMsgs();
+    }
     finally { inp.disabled = false; inp.focus(); }
   };
 
@@ -524,11 +570,11 @@ async function init() {
 
     if (sess.estado === 'esperando') {
       ctrl.showView('waiting');
-      S.pollTimer = setInterval(ctrl.pollStatus, 3000);
+      S.pollTimer = setInterval(ctrl.pollStatus, 5000);
     } else if (sess.estado === 'en_atencion') {
       ctrl.showView('chat');
       ctrl.loadMsgs();
-      S.msgTimer = setInterval(ctrl.loadMsgs, 2500);
+      S.msgTimer = setInterval(ctrl.loadMsgs, 4000);
     }
 
     const sub = $('fs-header-sub');

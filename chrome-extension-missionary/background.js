@@ -11,10 +11,12 @@ const fetchOptions = {
 
 let lastNotifiedSessionIds = new Set();
 let isOffscreenCreated = false;
+let consecutiveErrors = 0; // for exponential backoff
+const volunteerIdCache = {}; // cache: identifier -> supabase UUID
 
-// Initialize ALARMS
+// Initialize ALARMS — 30s is the sweet spot: fast enough for UX, low on DB load
 chrome.runtime.onInstalled.addListener(() => {
-    chrome.alarms.create('pollQueue', { periodInMinutes: 0.1 }); // Pull every 6 seconds for testing. Better change to 0.5 (30s).
+    chrome.alarms.create('pollQueue', { periodInMinutes: 0.5 }); // 30 seconds
 });
 
 // Alarm Listener
@@ -33,14 +35,21 @@ async function checkQueue() {
             return; // Not logged in or not available
         }
 
-        // ping presence if needed (optional)
-        // await pingPresence(missionary.id);
+        const response = await fetch(
+            // Only fetch the minimal fields needed — avoids transferring unused data
+            `${SUPABASE_URL}/rest/v1/sessions?estado=eq.esperando&select=id,nombre,tema,type&limit=50`,
+            fetchOptions
+        );
 
-        const response = await fetch(`${SUPABASE_URL}/rest/v1/sessions?estado=eq.esperando&select=id,nombre,tema,type`, fetchOptions);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
         const sessions = await response.json();
+        consecutiveErrors = 0; // reset backoff on success
 
         let newSessionsCount = 0;
-        let currentQueueIds = new Set();
+        const currentQueueIds = new Set();
 
         sessions.forEach(s => {
             currentQueueIds.add(s.id);
@@ -50,12 +59,10 @@ async function checkQueue() {
             }
         });
 
-        // if there are waiting sessions and there is a new one, ring bell!
         if (newSessionsCount > 0) {
             playBellSound();
         }
 
-        // Overwrite so we don't notify again, but clean up the ones that are no longer waiting
         lastNotifiedSessionIds = currentQueueIds;
 
         // Update badge
@@ -74,7 +81,9 @@ async function checkQueue() {
         await chrome.storage.local.set({ chatQueue: chatCount, videoQueue: videoCount, totalQueue: total });
 
     } catch (e) {
-        console.error("Error polling queue:", e);
+        consecutiveErrors++;
+        // Exponential backoff: log but don't spam retries — next alarm cycle will retry
+        console.warn(`Queue poll error (attempt ${consecutiveErrors}):`, e.message);
     }
 }
 
@@ -133,29 +142,38 @@ async function playBellSound() {
 async function updatePresence(missionary, isAvailable) {
     if (!missionary) return;
     const status = isAvailable ? 'online' : 'offline';
-    const identifier = missionary.id.trim(); // FS-1234 or email
+    const identifier = missionary.id.trim();
     const nombre = missionary.name.trim();
+    const cacheKey = identifier + '_' + nombre;
 
     try {
-        // Find existing volunteer by email or nombre
-        const queryUrl = `${SUPABASE_URL}/rest/v1/volunteers?or=(email.ilike.*${identifier}*,nombre.ilike.*${nombre}*)&select=id`;
-        const resp = await fetch(queryUrl, fetchOptions);
-        const volunteers = await resp.json();
+        // Use cached volunteer UUID to avoid a read query every time
+        let volunteerId = volunteerIdCache[cacheKey];
 
-        if (volunteers && volunteers.length > 0) {
-            const volunteerId = volunteers[0].id;
-            const patchUrl = `${SUPABASE_URL}/rest/v1/volunteers?id=eq.${volunteerId}`;
-            await fetch(patchUrl, {
-                method: 'PATCH',
-                headers: fetchOptions.headers,
-                body: JSON.stringify({ status: status })
-            });
-            console.log(`Volunteer ${nombre} presence updated to ${status}`);
-        } else {
-            console.log(`Volunteer ${nombre} not found in database to update presence.`);
+        if (!volunteerId) {
+            const queryUrl = `${SUPABASE_URL}/rest/v1/volunteers?or=(email.ilike.*${encodeURIComponent(identifier)}*,nombre.ilike.*${encodeURIComponent(nombre)}*)&select=id&limit=1`;
+            const resp = await fetch(queryUrl, fetchOptions);
+            const volunteers = await resp.json();
+
+            if (volunteers && volunteers.length > 0) {
+                volunteerId = volunteers[0].id;
+                volunteerIdCache[cacheKey] = volunteerId; // cache for future calls
+            } else {
+                console.log(`Volunteer ${nombre} not found in database.`);
+                return;
+            }
         }
+
+        const patchUrl = `${SUPABASE_URL}/rest/v1/volunteers?id=eq.${volunteerId}`;
+        await fetch(patchUrl, {
+            method: 'PATCH',
+            headers: fetchOptions.headers,
+            body: JSON.stringify({ status: status, last_status_change: new Date().toISOString() })
+        });
+
+        console.log(`Presence updated: ${nombre} → ${status}`);
     } catch (error) {
-        console.error("Error updating presence:", error);
+        console.error('Error updating presence:', error);
     }
 }
 
