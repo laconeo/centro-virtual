@@ -764,19 +764,16 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
             <p className="text-gray-400 text-sm italic text-center py-4">No hay sesiones registradas para la fecha seleccionada.</p>
           ) : (
             <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-              <table className="w-full text-sm text-left">
+              <table className="w-full text-xs text-left table-fixed">
                 <thead className="bg-gray-50 text-gray-500 border-b border-gray-200">
                   <tr>
-                    <th className="px-4 py-3">Hora</th>
-                    <th className="px-4 py-3">Usuario</th>
-                    <th className="px-4 py-3">País</th>
-                    <th className="px-4 py-3">Tema</th>
-                    <th className="px-4 py-3">Canal</th>
-                    <th className="px-4 py-3">Idioma</th>
-                    <th className="px-4 py-3 text-center">Espera</th>
-                    <th className="px-4 py-3 text-center">Duración</th>
-                    <th className="px-4 py-3">Atendido Por</th>
-                    <th className="px-4 py-3 text-center">Calificación / Feedback</th>
+                    <th className="px-2 py-2 font-medium w-[48px]">Hora</th>
+                    <th className="px-2 py-2 font-medium w-[22%]">Usuario · Email</th>
+                    <th className="px-2 py-2 font-medium w-[22%]">País · Tema</th>
+                    <th className="px-2 py-2 font-medium w-[90px] text-center">Canal</th>
+                    <th className="px-2 py-2 font-medium w-[90px] text-center">Espera / Dur.</th>
+                    <th className="px-2 py-2 font-medium w-[14%]">Atendido</th>
+                    <th className="px-2 py-2 font-medium w-[100px] text-center">Calificación</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -785,58 +782,81 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
                     const isAbandoned = s.estado === 'abandonado';
                     return (
                       <tr key={s.id} className={isAbandoned ? 'bg-red-50' : 'hover:bg-gray-50'}>
-                        <td className="px-4 py-3 text-gray-600">{new Date(s.fecha_ingreso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
-                        <td className="px-4 py-3 font-medium text-gray-900">{s.nombre} {s.apellido}</td>
-                        <td className="px-4 py-3 text-gray-600">{s.pais}</td>
-                        <td className="px-4 py-3 text-gray-600 truncate max-w-[200px]">{s.tema}</td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${s.type === 'video' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-                            {s.type === 'video' ? <Video className="w-3 h-3" /> : <MessageSquare className="w-3 h-3" />}
-                            {s.type === 'video' ? 'Video' : 'Chat'}
-                          </span>
+
+                        {/* Hora */}
+                        <td className="px-2 py-2 text-gray-400 align-top">
+                          {new Date(s.fecha_ingreso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </td>
-                        <td className="px-4 py-3">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-amber-50 text-amber-700 border border-amber-100 uppercase">
-                            {s.idioma || 'ES'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-center text-gray-600">
-                          {s.tiempo_espera_minutos}m
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          {isAbandoned ? (
-                            <span className="text-red-500 text-xs">-</span>
+
+                        {/* Usuario + Email */}
+                        <td className="px-2 py-2 align-top">
+                          <div className="font-medium text-gray-900 truncate">{s.nombre} {s.apellido}</div>
+                          {s.email ? (
+                            <a href={`mailto:${s.email}`} className="text-[var(--color-fs-blue)] hover:underline truncate block" title={s.email}>
+                              {s.email}
+                            </a>
                           ) : (
-                            <span className="font-semibold text-gray-700">{s.duracion_conversacion_minutos || 0}m</span>
+                            <span className="text-gray-300">sin email</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-gray-600">
+
+                        {/* País + Tema */}
+                        <td className="px-2 py-2 align-top">
+                          <div className="text-gray-500 truncate">{s.pais}</div>
+                          <div className="text-gray-400 truncate">{s.tema}</div>
+                        </td>
+
+                        {/* Canal + Idioma */}
+                        <td className="px-2 py-2 text-center align-top">
+                          <div className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${s.type === 'video' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                            {s.type === 'video' ? <Video className="w-2.5 h-2.5" /> : <MessageSquare className="w-2.5 h-2.5" />}
+                            {s.type === 'video' ? 'Video' : 'Chat'}
+                          </div>
+                          <div className="mt-1">
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-100 uppercase">
+                              {s.idioma || 'ES'}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Espera + Duración en una celda */}
+                        <td className="px-2 py-2 text-center align-top text-gray-500">
+                          <div title="Tiempo de espera">⏳ {s.tiempo_espera_minutos}m</div>
+                          <div className="font-semibold text-gray-700" title="Duración">
+                            {isAbandoned ? <span className="text-red-400">–</span> : `🗨 ${s.duracion_conversacion_minutos || 0}m`}
+                          </div>
+                        </td>
+
+                        {/* Atendido Por */}
+                        <td className="px-2 py-2 text-gray-500 align-top truncate">
                           {s.voluntario_id ? (
                             s.voluntario_id === volunteer.id
-                              ? t('dashboard_you')
+                              ? <span className="font-semibold text-[var(--color-primary-700)]">{t('dashboard_you')}</span>
                               : (onlineVolunteers.find(v => v.id === s.voluntario_id)?.nombre || t('dashboard_other_volunteer'))
                           ) : '-'}
                         </td>
-                        <td className="px-4 py-3 text-center">
+
+                        {/* Calificación */}
+                        <td className="px-2 py-2 text-center align-top">
                           {survey ? (
-                            <div className="flex items-center justify-center gap-3">
+                            <div className="flex flex-col items-center gap-1">
                               <div className="flex items-center gap-0.5 text-yellow-400">
                                 {Array.from({ length: 5 }).map((_, i) => (
-                                  <Star key={i} className={`w-3 h-3 ${i < survey.calificacion ? 'fill-current' : 'text-gray-200'}`} />
+                                  <Star key={i} className={`w-2.5 h-2.5 ${i < survey.calificacion ? 'fill-current' : 'text-gray-200'}`} />
                                 ))}
                               </div>
                               {survey.comentarios && (
                                 <button
                                   onClick={() => setSelectedComment(survey.comentarios!)}
-                                  className="text-[var(--color-fs-blue)] hover:text-[var(--color-fs-blue-hover)] bg-blue-50 p-1.5 rounded-full transition-colors cursor-pointer"
+                                  className="text-[var(--color-fs-blue)] hover:text-[var(--color-fs-blue-hover)] bg-blue-50 p-0.5 rounded-full transition-colors cursor-pointer"
                                   title="Ver comentario"
                                 >
-                                  <MessageSquare className="w-4 h-4" />
+                                  <MessageSquare className="w-3 h-3" />
                                 </button>
                               )}
                             </div>
                           ) : (
-                            <span className="text-gray-300 text-xs">-</span>
+                            <span className="text-gray-300">-</span>
                           )}
                         </td>
                       </tr>

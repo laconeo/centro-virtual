@@ -1,4 +1,4 @@
-{
+﻿{
     "language": "Papiamento",
     "app_title": "Centro Virtual",
     "footer_text": "© 2026 Trahá ku ❤️ pa brinda sosten na e usuario",
@@ -8,6 +8,7 @@
     "video_desc": "Papia kara pa kara ku un Misionero",
     "chat_option": "Chat",
     "chat_desc": "Skibi bo preguntanan bibu",
+    "chat_tip": " Ideal durante evento pa rekuperá kuentanan (mas liher)",
     "request_video_title": "Solisitá Video yamada",
     "request_chat_title": "Solisitá Chat",
     "start_video_header": "Inisiá bo video konsulta",
@@ -76,7 +77,7 @@
     "btn_send_link": "Manda Link",
     "btn_sending": "Mandando...",
     "welcome_user": "Bon bini, {name}",
-    "error_email_not_confirmed": "Su email no ha sido confirmado a�n. Por favor, vaya a su correo electr�nico para confirmar su cuenta.",
+    "error_email_not_confirmed": "Su email no ha sido confirmado a�n. Por favor, vaya a su correo electr�nico para confirmar su cuenta.",
     "logout_success": "Seshon será",
     "dashboard_status_change": "Status kambiá pa {status}",
     "dashboard_available": "Disponibel",

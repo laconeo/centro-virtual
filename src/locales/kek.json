@@ -1,4 +1,4 @@
-{
+﻿{
     "language": "Q'eqchi'",
     "app_title": "Centro Virtual",
     "footer_text": "© 2026 Yiib'anb'il rik'in ❤️ re xk'eeb'al tenq'ankil li aj oksihel",
@@ -8,6 +8,7 @@
     "video_desc": "Aatinan chiru li Misioner",
     "chat_option": "Chat",
     "chat_desc": "Tz'iib'a laa patz'om",
+    "chat_tip": " Ideal pa li q'eq q'ij richin q'omanik cuenta (nim wayru')",
     "request_video_title": "Tz'aama aatinak sa' Video",
     "request_chat_title": "Tz'aama Chat",
     "start_video_header": "Tikib' aatinak sa' video",
@@ -76,7 +77,7 @@
     "btn_send_link": "Taqla li Link",
     "btn_sending": "Yook chi taqlank...",
     "welcome_user": "Sahil ch'oolej, {name}",
-    "error_email_not_confirmed": "Su email no ha sido confirmado a�n. Por favor, vaya a su correo electr�nico para confirmar su cuenta.",
+    "error_email_not_confirmed": "Su email no ha sido confirmado a�n. Por favor, vaya a su correo electr�nico para confirmar su cuenta.",
     "logout_success": "Xtzap li okem",
     "dashboard_status_change": "Xjalaak xwankil sa' {status}",
     "dashboard_available": "Sik'b'il",

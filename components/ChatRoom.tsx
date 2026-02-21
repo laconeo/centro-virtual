@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../src/contexts/LanguageContext';
 import { Send, User, BadgeHelp } from 'lucide-react';
+
 import { UserSession, Message } from '../types';
 import { supabaseService } from '../services/supabaseService';
 
@@ -342,6 +343,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ session, currentUser, onExit
                     <Send className="w-5 h-5 ml-0.5" />
                 </button>
             </form>
+
         </div>
     );
 };

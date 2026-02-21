@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { useLanguage } from '../src/contexts/LanguageContext';
-import { Video, MessageSquare, Loader2, X, FileText } from 'lucide-react';
+import { Video, MessageSquare, Loader2, X, FileText, PhoneCall, Mail } from 'lucide-react';
+
+const WHATSAPP_EMERGENCY_URL = 'https://chat.whatsapp.com/DGAXFWucF8w5NmQc21UGrl';
 import { Layout } from './ui/Layout';
 import { UserSession } from '../types';
 import { supabaseService } from '../services/supabaseService';
@@ -257,6 +259,11 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
               </div>
               <span className="text-lg md:text-xl font-bold text-[var(--color-fs-blue)] uppercase tracking-wide">{t('chat_option')}</span>
               <span className="text-xs md:text-sm text-gray-500 mt-2 text-center">{t('chat_desc')}</span>
+              {t('chat_tip') && (
+                <span style={{ background: 'var(--color-primary-50)', color: 'var(--color-primary-700)', borderColor: 'var(--color-primary-100)' }} className="mt-3 px-2 py-1 text-[10px] md:text-xs font-semibold rounded-full text-center leading-tight border">
+                  {t('chat_tip')}
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -360,14 +367,72 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
   if (step === 'waiting') {
     return (
       <Layout title={t('waiting_title')} onVolunteerClick={onVolunteerAccess}>
-        <div className="flex flex-col items-center justify-center py-20 animate-fade-in text-center">
+        <div className="flex flex-col items-center justify-center py-6 px-4 animate-fade-in text-center w-full max-w-lg mx-auto">
           <Loader2 className="w-16 h-16 text-[var(--color-primary)] animate-spin mb-6" />
           <h2 className="text-2xl font-light mb-2">{t('waiting_status')}</h2>
           <p className="text-[var(--color-fs-text-light)]">{t('waiting_desc')}</p>
-          <div className="mt-8 p-4 bg-blue-50 text-[var(--color-fs-blue)] rounded-lg text-sm max-w-md">
+          <div className="mt-4 p-4 bg-blue-50 text-[var(--color-fs-blue)] rounded-lg text-sm w-full">
             {t('waiting_info').replace('{topic}', sessionData?.tema || '')}
           </div>
-          <button onClick={handleCancel} className="mt-8 text-red-500 hover:text-red-700 font-medium text-sm underline cursor-pointer">
+
+          {/* Support channels panel */}
+          <div className="mt-4 w-full rounded-xl border border-[var(--color-fs-border)] bg-white shadow-[var(--shadow-card)] overflow-hidden">
+            <div className="bg-[var(--color-primary-50)] border-b border-[var(--color-primary-100)] px-4 py-3">
+              <p className="text-sm font-semibold text-[var(--color-primary-700)]">
+                ¿Nadie responde? Contáctanos directamente:
+              </p>
+            </div>
+
+            <div className="divide-y divide-[var(--color-fs-border)]">
+              {/* WhatsApp group */}
+              <a
+                href={WHATSAPP_EMERGENCY_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--color-primary-50)] transition-colors group"
+              >
+                <div className="w-9 h-9 rounded-full bg-[var(--color-primary-100)] flex items-center justify-center flex-shrink-0 group-hover:bg-[var(--color-primary-600)] transition-colors">
+                  <PhoneCall className="w-4 h-4 text-[var(--color-primary-700)] group-hover:text-white transition-colors" />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-semibold text-[var(--color-fs-text)]">Grupo de WhatsApp del equipo</p>
+                  <p className="text-xs text-[var(--color-fs-text-secondary)]">Prueba directamente con nuestro grupo</p>
+                </div>
+              </a>
+
+              {/* WhatsApp soporte oficial */}
+              <a
+                href="https://wa.me/5219541409079"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--color-primary-50)] transition-colors group"
+              >
+                <div className="w-9 h-9 rounded-full bg-[var(--color-fs-blue)]/10 flex items-center justify-center flex-shrink-0 group-hover:bg-[var(--color-fs-blue)] transition-colors">
+                  <PhoneCall className="w-4 h-4 text-[var(--color-fs-blue)] group-hover:text-white transition-colors" />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-semibold text-[var(--color-fs-text)]">Soporte oficial FamilySearch</p>
+                  <p className="text-xs text-[var(--color-fs-text-secondary)]">+52 1 954 140 9079 (WhatsApp)</p>
+                </div>
+              </a>
+
+              {/* Email */}
+              <a
+                href="mailto:support@familysearch.org"
+                className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--color-primary-50)] transition-colors group"
+              >
+                <div className="w-9 h-9 rounded-full bg-[var(--color-fs-blue)]/10 flex items-center justify-center flex-shrink-0 group-hover:bg-[var(--color-fs-blue)] transition-colors">
+                  <Mail className="w-4 h-4 text-[var(--color-fs-blue)] group-hover:text-white transition-colors" />
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-semibold text-[var(--color-fs-text)]">Correo electrónico</p>
+                  <p className="text-xs text-[var(--color-fs-text-secondary)]">support@familysearch.org</p>
+                </div>
+              </a>
+            </div>
+          </div>
+
+          <button onClick={handleCancel} className="mt-4 text-red-500 hover:text-red-700 font-medium text-sm underline cursor-pointer">
             {t('cancel_request')}
           </button>
         </div>
