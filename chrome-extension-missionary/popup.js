@@ -78,20 +78,35 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         const newMissionary = { id: missId, name: missName };
-        await chrome.storage.local.set({
-            missionary: newMissionary,
-            isAvailable: true
-        });
+        const currentLang = document.getElementById('lang-selector').value;
+        const dict = EXTN_LOCALES[currentLang] || EXTN_LOCALES['es'];
 
-        // Notify background to update Supabase PRESENCE
-        chrome.runtime.sendMessage({ action: 'update_presence', missionary: newMissionary, status: true });
+        btnLogin.disabled = true;
+        btnLogin.textContent = dict['ext_m_verifying'] || "Verificando...";
 
-        showMainView(newMissionary, true);
+        chrome.runtime.sendMessage({ action: 'verify_missionary', missionary: newMissionary }, async (response) => {
+            btnLogin.disabled = false;
+            btnLogin.textContent = dict['ext_m_connect'] || "Conectar";
 
-        // trigger background immediately
-        chrome.alarms.get('pollQueue', (alarm) => {
-            if (!alarm) {
-                chrome.alarms.create('pollQueue', { periodInMinutes: 0.5 });
+            if (response && response.ok) {
+                await chrome.storage.local.set({
+                    missionary: newMissionary,
+                    isAvailable: true
+                });
+
+                // Notify background to update Supabase PRESENCE
+                chrome.runtime.sendMessage({ action: 'update_presence', missionary: newMissionary, status: true });
+
+                showMainView(newMissionary, true);
+
+                // trigger background immediately
+                chrome.alarms.get('pollQueue', (alarm) => {
+                    if (!alarm) {
+                        chrome.alarms.create('pollQueue', { periodInMinutes: 0.5 });
+                    }
+                });
+            } else {
+                alert(dict['ext_m_verify_error'] || "Credenciales inválidas o no registradas.");
             }
         });
     });

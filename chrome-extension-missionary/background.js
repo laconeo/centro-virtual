@@ -15,8 +15,32 @@ let consecutiveErrors = 0; // for exponential backoff
 const volunteerIdCache = {}; // cache: identifier -> supabase UUID
 
 // Initialize ALARMS — 30s is the sweet spot: fast enough for UX, low on DB load
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener(async (details) => {
     chrome.alarms.create('pollQueue', { periodInMinutes: 0.5 }); // 30 seconds
+
+    // Register Extension installation efficiently
+    if (details.reason === 'install') {
+        try {
+            const result = await chrome.storage.local.get(['deviceId']);
+            let deviceId = result.deviceId;
+            if (!deviceId) {
+                deviceId = crypto.randomUUID();
+                await chrome.storage.local.set({ deviceId });
+            }
+
+            await fetch(`${SUPABASE_URL}/rest/v1/extension_installs`, {
+                method: 'POST',
+                headers: fetchOptions.headers,
+                body: JSON.stringify({
+                    device_id: deviceId,
+                    extension_type: 'missionary'
+                })
+            });
+            console.log('Installation registered successfully');
+        } catch (error) {
+            console.error('Error registering install:', error);
+        }
+    }
 });
 
 // Alarm Listener
@@ -110,7 +134,7 @@ chrome.notifications.onClicked.addListener((notificationId) => {
         const BASE_URL = isDev ? 'http://localhost:3000' : 'https://laconeo.github.io/centro-virtual';
 
         // Open the virtual center backend properly authenticated
-        const urlToOpen = `${BASE_URL}/atender/${sessionId}`;
+        const urlToOpen = `${BASE_URL}/?atender=${sessionId}`;
         chrome.tabs.create({ url: urlToOpen });
     }
 });
@@ -181,6 +205,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === 'update_presence') {
         updatePresence(message.missionary, message.status);
         sendResponse({ ok: true });
+    } else if (message.action === 'verify_missionary') {
+        const identifier = message.missionary.id.trim();
+        const nombre = message.missionary.name.trim();
+        const queryUrl = `${SUPABASE_URL}/rest/v1/volunteers?or=(email.ilike.*${encodeURIComponent(identifier)}*,nombre.ilike.*${encodeURIComponent(nombre)}*)&select=id&limit=1`;
+
+        fetch(queryUrl, fetchOptions)
+            .then(resp => resp.json())
+            .then(volunteers => {
+                if (volunteers && volunteers.length > 0) {
+                    sendResponse({ ok: true });
+                } else {
+                    sendResponse({ ok: false });
+                }
+            })
+            .catch(err => {
+                console.error('Error verifying missionary:', err);
+                sendResponse({ ok: false, error: err.toString() });
+            });
+        return true; // Indicates asynchronous response
     }
     return true;
 });

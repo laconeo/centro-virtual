@@ -9,8 +9,9 @@ import { Volunteer } from './types';
 import { Layout } from './components/ui/Layout';
 import { supabaseService } from './services/supabaseService';
 import { UserLandingExtension } from './components/UserLandingExtension';
+import { ExtensionsDashboard } from './components/ExtensionsDashboard';
 
-type ViewState = 'home' | 'user-flow' | 'volunteer-login' | 'volunteer-dashboard' | 'config' | 'extension-landing';
+type ViewState = 'home' | 'user-flow' | 'volunteer-login' | 'volunteer-dashboard' | 'config' | 'extension-landing' | 'extensions-dashboard';
 
 function App() {
   const [view, setView] = useState<ViewState>('home');
@@ -32,6 +33,8 @@ function App() {
         }
       } else if (url.searchParams.has('extension')) {
         setView('extension-landing');
+      } else if (url.searchParams.has('dashboard') && url.searchParams.get('dashboard') === 'extensions') {
+        setView('extensions-dashboard');
       }
     };
     initRoute();
@@ -93,6 +96,15 @@ function App() {
     return (
       <>
         <UserLandingExtension />
+        <Toaster position="top-right" />
+      </>
+    );
+  }
+
+  if (view === 'extensions-dashboard') {
+    return (
+      <>
+        <ExtensionsDashboard />
         <Toaster position="top-right" />
       </>
     );

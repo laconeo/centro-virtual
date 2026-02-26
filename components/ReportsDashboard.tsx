@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabaseService } from '../services/supabaseService';
 import { UserSession, SatisfactionSurvey } from '../types';
-import { X, Calendar, Download, BarChart2, PieChart, Clock, Star, Users, Video, MessageSquare, Activity } from 'lucide-react';
+import { X, Calendar, Download, BarChart2, PieChart, Clock, Star, Users, Video, MessageSquare, Activity, DownloadCloud } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface ReportsDashboardProps {
@@ -234,6 +234,15 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ onClose }) =
                         </select>
                     </div>
 
+                    <a
+                        href="?dashboard=extensions"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition"
+                        title="Ver dashboard de instalaciones de extensiones"
+                    >
+                        <DownloadCloud className="w-4 h-4" /> Extensiones
+                    </a>
                     <button
                         onClick={handleExportExcel}
                         className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition"

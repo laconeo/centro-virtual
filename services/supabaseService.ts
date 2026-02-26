@@ -605,6 +605,27 @@ class SupabaseService {
         return { error };
     }
 
+    // --- EXTENSIONS DASHBOARD ---
+    async getExtensionInstallsCount() {
+        const userCountResp = await supabase
+            .from('extension_installs')
+            .select('*', { count: 'exact', head: true })
+            .eq('extension_type', 'user');
+
+        const missionaryCountResp = await supabase
+            .from('extension_installs')
+            .select('*', { count: 'exact', head: true })
+            .eq('extension_type', 'missionary');
+
+        return {
+            data: {
+                user: userCountResp.count || 0,
+                missionary: missionaryCountResp.count || 0,
+            },
+            error: userCountResp.error || missionaryCountResp.error
+        };
+    }
+
 
 }
 

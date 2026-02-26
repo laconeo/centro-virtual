@@ -20,9 +20,11 @@ const EXTN_LOCALES = {
     "ext_m_video": "Video",
     "ext_m_chat": "Chat",
     "ext_m_wait": "Espera",
-    "ext_m_sgo": "Abrir SGO para más proyectos",
+    "ext_m_sgo": "Reportar servicio en el SGO",
     "ext_m_logout": "Cerrar Sesión",
-    "ext_m_fill_fields": "Completa todos los campos"
+    "ext_m_fill_fields": "Completa todos los campos",
+    "ext_m_verifying": "Verificando...",
+    "ext_m_verify_error": "Credenciales inválidas o no registradas"
   },
   "fr": {
     "ext_user_title": "Centre Virtuel",
@@ -45,9 +47,11 @@ const EXTN_LOCALES = {
     "ext_m_video": "Vidéo",
     "ext_m_chat": "Chat",
     "ext_m_wait": "Attente",
-    "ext_m_sgo": "Ouvrir SGO pour plus de projets",
+    "ext_m_sgo": "Signaler le service dans le SGO",
     "ext_m_logout": "Se déconnecter",
-    "ext_m_fill_fields": "Remplissez tous les champs"
+    "ext_m_fill_fields": "Remplissez tous les champs",
+    "ext_m_verifying": "Vérification...",
+    "ext_m_verify_error": "Identifiants invalides ou non enregistrés"
   },
   "gn": {
     "ext_user_title": "Centro Virtual",
@@ -70,9 +74,11 @@ const EXTN_LOCALES = {
     "ext_m_video": "Video",
     "ext_m_chat": "Chat",
     "ext_m_wait": "Espera",
-    "ext_m_sgo": "Abrir SGO para más proyectos",
+    "ext_m_sgo": "Reportar servicio en el SGO",
     "ext_m_logout": "Cerrar Sesión",
-    "ext_m_fill_fields": "Completa todos los campos"
+    "ext_m_fill_fields": "Completa todos los campos",
+    "ext_m_verifying": "Verificando...",
+    "ext_m_verify_error": "Credenciales inválidas o no registradas"
   },
   "ht": {
     "ext_user_title": "Centro Virtual",
@@ -95,9 +101,11 @@ const EXTN_LOCALES = {
     "ext_m_video": "Video",
     "ext_m_chat": "Chat",
     "ext_m_wait": "Espera",
-    "ext_m_sgo": "Abrir SGO para más proyectos",
+    "ext_m_sgo": "Reportar servicio en el SGO",
     "ext_m_logout": "Cerrar Sesión",
-    "ext_m_fill_fields": "Completa todos los campos"
+    "ext_m_fill_fields": "Completa todos los campos",
+    "ext_m_verifying": "Verificando...",
+    "ext_m_verify_error": "Credenciales inválidas o no registradas"
   },
   "kek": {
     "ext_user_title": "Centro Virtual",
@@ -120,9 +128,11 @@ const EXTN_LOCALES = {
     "ext_m_video": "Video",
     "ext_m_chat": "Chat",
     "ext_m_wait": "Espera",
-    "ext_m_sgo": "Abrir SGO para más proyectos",
+    "ext_m_sgo": "Reportar servicio en el SGO",
     "ext_m_logout": "Cerrar Sesión",
-    "ext_m_fill_fields": "Completa todos los campos"
+    "ext_m_fill_fields": "Completa todos los campos",
+    "ext_m_verifying": "Verificando...",
+    "ext_m_verify_error": "Credenciales inválidas o no registradas"
   },
   "pap": {
     "ext_user_title": "Centro Virtual",
@@ -145,9 +155,11 @@ const EXTN_LOCALES = {
     "ext_m_video": "Video",
     "ext_m_chat": "Chat",
     "ext_m_wait": "Espera",
-    "ext_m_sgo": "Abrir SGO para más proyectos",
+    "ext_m_sgo": "Reportar servicio en el SGO",
     "ext_m_logout": "Cerrar Sesión",
-    "ext_m_fill_fields": "Completa todos los campos"
+    "ext_m_fill_fields": "Completa todos los campos",
+    "ext_m_verifying": "Verificando...",
+    "ext_m_verify_error": "Credenciales inválidas o no registradas"
   },
   "pt": {
     "ext_user_title": "Centro Virtual",
@@ -170,9 +182,11 @@ const EXTN_LOCALES = {
     "ext_m_video": "Vídeo",
     "ext_m_chat": "Chat",
     "ext_m_wait": "Espera",
-    "ext_m_sgo": "Abrir SGO para mais projetos",
+    "ext_m_sgo": "Reportar serviço no SGO",
     "ext_m_logout": "Sair",
-    "ext_m_fill_fields": "Preencha todos os campos"
+    "ext_m_fill_fields": "Preencha todos os campos",
+    "ext_m_verifying": "Verificando...",
+    "ext_m_verify_error": "Credenciais inválidas ou não registradas"
   },
   "qu": {
     "ext_user_title": "Centro Virtual",
@@ -195,9 +209,11 @@ const EXTN_LOCALES = {
     "ext_m_video": "Video",
     "ext_m_chat": "Chat",
     "ext_m_wait": "Espera",
-    "ext_m_sgo": "Abrir SGO para más proyectos",
+    "ext_m_sgo": "Reportar servicio en el SGO",
     "ext_m_logout": "Cerrar Sesión",
-    "ext_m_fill_fields": "Completa todos los campos"
+    "ext_m_fill_fields": "Completa todos los campos",
+    "ext_m_verifying": "Verificando...",
+    "ext_m_verify_error": "Credenciales inválidas o no registradas"
   },
   "quc": {
     "ext_user_title": "Centro Virtual",
@@ -220,8 +236,10 @@ const EXTN_LOCALES = {
     "ext_m_video": "Video",
     "ext_m_chat": "Chat",
     "ext_m_wait": "Espera",
-    "ext_m_sgo": "Abrir SGO para más proyectos",
+    "ext_m_sgo": "Reportar servicio en el SGO",
     "ext_m_logout": "Cerrar Sesión",
-    "ext_m_fill_fields": "Completa todos los campos"
+    "ext_m_fill_fields": "Completa todos los campos",
+    "ext_m_verifying": "Verificando...",
+    "ext_m_verify_error": "Credenciales inválidas o no registradas"
   }
 };
