@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../src/contexts/LanguageContext';
-import { Send, User, BadgeHelp } from 'lucide-react';
+import { Send, User, BadgeHelp, Download } from 'lucide-react';
 
 import { UserSession, Message } from '../types';
 import { supabaseService } from '../services/supabaseService';
@@ -21,28 +21,38 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ session, currentUser, onExit
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const messagesContainerRef = useRef<HTMLDivElement>(null);
+    const lastTimestampRef = useRef<string | null>(null);
+
+    const fetchMessagesIncremental = async () => {
+        const { data } = await supabaseService.getMessages(session.id, lastTimestampRef.current || undefined);
+        if (data && data.length > 0) {
+            const newMessages = data as Message[];
+            lastTimestampRef.current = newMessages[newMessages.length - 1].timestamp;
+
+            setMessages(prev => {
+                const existingIds = new Set(prev.map(m => m.id));
+                const toAdd = newMessages.filter(m => !existingIds.has(m.id));
+                if (toAdd.length === 0) return prev;
+
+                let withoutTemps = prev;
+                // Remove temporary placeholder messages replacing them with their finalized backend version
+                toAdd.forEach(realMsg => {
+                    if (realMsg.sender === currentUser) {
+                       withoutTemps = withoutTemps.filter(m => !(m.id.startsWith('temp-') && m.text === realMsg.text));
+                    }
+                });
+
+                return [...withoutTemps, ...toAdd];
+            });
+        }
+    };
 
     // Poll for messages
     useEffect(() => {
-        const fetchMessages = async () => {
-            const { data } = await supabaseService.getMessages(session.id);
-            if (data) {
-                const newMessages = data as Message[];
-                // OPTIMIZATION: Only update state if messages actually changed
-                setMessages(prev => {
-                    if (prev.length === newMessages.length &&
-                        (prev.length === 0 || prev[prev.length - 1].id === newMessages[newMessages.length - 1].id)) {
-                        return prev;
-                    }
-                    return newMessages;
-                });
-            }
-        };
-
-        fetchMessages();
-        const interval = setInterval(fetchMessages, 2000); // 2 second poll
+        fetchMessagesIncremental();
+        const interval = setInterval(fetchMessagesIncremental, 2500); // 2.5 second poll (incremental)
         return () => clearInterval(interval);
-    }, [session.id]);
+    }, [session.id, currentUser]);
 
     // Scroll to bottom on new messages
     useEffect(() => {
@@ -116,6 +126,41 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ session, currentUser, onExit
         };
     }, []);
 
+    const handleExportChat = () => {
+        if (!messages.length) return;
+
+        let textContent = `Chat Transcript - Centro Virtual FamilySearch\n`;
+        textContent += `Fecha: ${new Date().toLocaleDateString()}\n`;
+        textContent += `Tema: ${session.tema}\n`;
+        textContent += `Usuario: ${session.nombre} ${session.apellido}\n\n`;
+
+        messages.forEach(m => {
+            const time = new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            
+            let senderName = '';
+            if (m.sender === 'system') {
+                senderName = 'Sistema';
+            } else if (m.sender === 'user') {
+                senderName = `${session.nombre} ${session.apellido} (Usuario)`;
+            } else {
+                senderName = m.volunteer_id && volunteerNames[m.volunteer_id] ? volunteerNames[m.volunteer_id] : (session.voluntario_nombre || 'Misionero');
+                senderName += ' (Voluntario)';
+            }
+
+            textContent += `[${time}] ${senderName}: ${m.text}\n`;
+        });
+
+        const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `chat_historial_${session.nombre}_${new Date().getTime()}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
         const text = inputText.trim();
@@ -147,17 +192,8 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ session, currentUser, onExit
                 currentUser === 'volunteer' ? currentVolunteerId : undefined
             );
 
-            // Refetch quietly 
-            const { data } = await supabaseService.getMessages(session.id);
-            if (data) {
-                setMessages(prev => {
-                    const newMessages = data as Message[];
-                    if (prev.length === newMessages.length && (prev.length === 0 || prev[prev.length - 1].id === newMessages[newMessages.length - 1].id)) {
-                        return prev;
-                    }
-                    return newMessages;
-                });
-            }
+            // Refetch quietly using incremental cursor
+            await fetchMessagesIncremental();
         } catch (error) {
             console.error("Error sending message:", error);
         }
@@ -183,8 +219,16 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ session, currentUser, onExit
                         {currentUser === 'user' ? t('chat_wait_message') : t('chat_topic').replace('{topic}', session.tema)}
                     </p>
                 </div>
-                {/* Determine which button to show */}
-                {(() => {
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={handleExportChat}
+                        className="text-xs bg-white/20 hover:bg-white/30 px-3 py-1.5 rounded transition-colors cursor-pointer flex items-center gap-1 font-semibold"
+                        title="Exportar transcripción del chat"
+                    >
+                        <Download className="w-3 h-3" /> Exportar
+                    </button>
+                    {/* Determine which button to show */}
+                    {(() => {
                     // User can always end the session
                     if (currentUser === 'user' && onEndSession) {
                         return (
@@ -226,6 +270,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ session, currentUser, onExit
 
                     return null;
                 })()}
+                </div>
             </div>
 
             {/* Messages Area */}

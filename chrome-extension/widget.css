@@ -509,6 +509,24 @@
     color: #213547;
 }
 
+.fs-export-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: #64748b;
+    padding: 6px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.fs-export-btn:hover {
+    background: #f1f5f9;
+    color: #005994;
+}
+
 #fs-messages {
     flex: 1;
     overflow-y: auto;

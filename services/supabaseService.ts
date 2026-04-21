@@ -194,12 +194,18 @@ class SupabaseService {
 
     // --- MESSAGING METHODS ---
 
-    async getMessages(sessionId: string) {
-        const { data, error } = await supabase
+    async getMessages(sessionId: string, afterTimestamp?: string) {
+        let query = supabase
             .from('messages')
             .select('*')
             .eq('session_id', sessionId)
             .order('created_at', { ascending: true });
+
+        if (afterTimestamp) {
+            query = query.gt('created_at', afterTimestamp);
+        }
+
+        const { data, error } = await query;
 
         if (error) return { data: [], error };
 

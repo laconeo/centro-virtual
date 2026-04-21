@@ -218,9 +218,14 @@ function buildWidget() {
 
     <!-- CHAT ACTIVO -->
     <div id="fs-view-chat" class="fs-view" style="display:none">
-      <div id="fs-status-bar">
-        <span class="fs-dot"></span>
-        <span id="fs-vol-label">Voluntario conectado</span>
+      <div id="fs-status-bar" style="justify-content: space-between;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span class="fs-dot"></span>
+          <span id="fs-vol-label">Voluntario conectado</span>
+        </div>
+        <button id="fs-btn-export" title="Exportar chat" class="fs-export-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        </button>
       </div>
       <div id="fs-messages"></div>
       <form id="fs-msg-form" class="fs-input-row">
@@ -437,6 +442,39 @@ function buildWidget() {
       S.session = null;
     }
     clearState(); showView('form');
+  };
+
+  $('fs-btn-export').onclick = async () => {
+    if (!S.session) return;
+    const btn = $('fs-btn-export');
+    btn.style.opacity = '0.5';
+    try {
+      const msgs = await sbSelect('messages', `session_id=eq.${S.session.id}&order=created_at.asc&select=*`);
+      if (msgs && msgs.length) {
+        let textContent = `Chat - Centro Virtual FamilySearch\n`;
+        textContent += `Fecha: ${new Date().toLocaleDateString()}\n`;
+        textContent += `Tema: ${S.session.tema}\n\n`;
+
+        msgs.forEach(m => {
+          const time = new Date(m.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const sender = m.sender === 'user' ? 'Yo' : (S.session.voluntario_nombre || 'Misionero');
+          textContent += `[${time}] ${sender}: ${m.text}\n`;
+        });
+
+        const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `chat_centro_virtual_${new Date().getTime()}.txt`;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    btn.style.opacity = '1';
   };
 
   // ── Mensajes: incremental (solo trae lo nuevo) ────────────────
