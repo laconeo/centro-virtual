@@ -25,6 +25,17 @@ const loadState = () => new Promise(res => {
   catch (e) { res(null); }
 });
 
+const saveUserData = (data) => {
+  if (!isValid()) return;
+  try { chrome.storage.local.set({ fsUserData: { nombre: data.nombre, apellido: data.apellido, email: data.email } }); }
+  catch (e) { }
+};
+const loadUserData = () => new Promise(res => {
+  if (!isValid()) { res({}); return; }
+  try { chrome.storage.local.get(['fsUserData'], r => res(r.fsUserData || {})); }
+  catch (e) { res({}); }
+});
+
 // ── Estado reactivo ──────────────────────────────────────────────────
 let S = {
   session: null,
@@ -137,8 +148,7 @@ function buildWidget() {
         <div class="fs-row">
           <div class="fs-g"><label>País *</label>
             <select id="fs-pais" required>
-              <option value="">— Selecciona —</option>
-              <option value="Argentina">Argentina</option>
+              <option value="Argentina" selected>Argentina</option>
               <option value="Bolivia">Bolivia</option>
               <option value="Chile">Chile</option>
               <option value="Colombia">Colombia</option>
@@ -329,16 +339,25 @@ function buildWidget() {
         S.topicsCache = await sbSelect('topics', 'active=eq.true&order=titulo.asc&select=titulo');
       }
       const sel = $('fs-tema');
-      sel.innerHTML = '<option value="">— Selecciona —</option>';
+      sel.innerHTML = '';
       // Use DocumentFragment to batch DOM insertions
       const frag = document.createDocumentFragment();
       S.topicsCache.forEach(t => {
         const o = document.createElement('option');
         o.value = o.textContent = t.titulo;
+        if (t.titulo === 'Feria del Libro') o.selected = true;
         frag.appendChild(o);
       });
       sel.appendChild(frag);
     } catch (e) { }
+  })();
+
+  // ── Cargar User Data Cache ────────────────────────
+  (async () => {
+    const ud = await loadUserData();
+    if (ud.nombre) { const n = $('fs-nombre'); if (n) n.value = ud.nombre; }
+    if (ud.apellido) { const a = $('fs-apellido'); if (a) a.value = ud.apellido; }
+    if (ud.email) { const e = $('fs-email'); if (e) e.value = ud.email; }
   })();
 
   // ── Formulario ─────────────────────────────────────────────────
@@ -365,6 +384,7 @@ function buildWidget() {
       return;
     }
 
+    saveUserData(data);
     S.userData = data;
     S.lastMsgTimestamp = null; // reset cursor for new session
     $('fs-w-nombre').textContent = data.nombre;
@@ -388,11 +408,15 @@ function buildWidget() {
     if (!S.session) return;
     try {
       // Only select status fields — no need for full record while waiting
-      const rows = await sbSelect('sessions', `id=eq.${S.session.id}&select=id,estado,voluntario_id`);
+      const rows = await sbSelect('sessions', `id=eq.${S.session.id}&select=id,estado,voluntario_id,volunteers(nombre)`);
       if (!rows?.length) return;
       const s = rows[0];
       if (s.estado === 'en_atencion') {
         clearInterval(S.pollTimer);
+        if (s.volunteers && s.volunteers.nombre) {
+            s.voluntario_nombre = s.volunteers.nombre;
+            delete s.volunteers;
+        }
         S.session = { ...S.session, ...s };
         persistState();
         showView('chat');
@@ -440,8 +464,25 @@ function buildWidget() {
       const frag = document.createDocumentFragment();
       msgs.forEach(m => {
         const d = document.createElement('div');
-        d.className = m.sender === 'user' ? 'fs-msg-user' : 'fs-msg-vol';
-        d.innerHTML = `<span class="fs-bubble">${esc(m.text)}</span>`;
+        const isVol = m.sender !== 'user';
+        d.className = isVol ? 'fs-msg-vol' : 'fs-msg-user';
+        
+        const date = new Date(m.created_at);
+        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        let header = '';
+        if (isVol) {
+          const volName = S.session?.voluntario_nombre || 'Voluntario';
+          header = `<div class="fs-msg-header">${esc(volName)}</div>`;
+        }
+
+        d.innerHTML = `
+          <div class="fs-msg-body">
+            ${header}
+            <span class="fs-bubble">${esc(m.text)}</span>
+            <div class="fs-msg-time">${timeStr}</div>
+          </div>
+        `;
         frag.appendChild(d);
         // Advance cursor to the latest timestamp seen
         if (!S.lastMsgTimestamp || m.created_at > S.lastMsgTimestamp) {
@@ -485,9 +526,25 @@ function buildWidget() {
     // Limpiar estrellas y textarea
     $$('.fs-star').forEach(s => s.classList.remove('fs-star-active'));
     const ta = $('fs-feedback-text'); if (ta) ta.value = '';
-    // Limpiar form
-    ['fs-nombre', 'fs-apellido', 'fs-email', 'fs-pais'].forEach(id => { const el = $(id); if (el) el.value = ''; });
-    const temaEl = $('fs-tema'); if (temaEl) temaEl.selectedIndex = 0;
+    
+    // Al resetear al form, si volvemos recargamos la data guardada.
+    // Solo restablecemos el país si existiera lógica, pero lo dejamos como está o as default.
+    loadUserData().then(ud => {
+      const n = $('fs-nombre'), a = $('fs-apellido'), e = $('fs-email');
+      if (n) n.value = ud.nombre || '';
+      if (a) a.value = ud.apellido || '';
+      if (e) e.value = ud.email || '';
+    });
+    
+    const temaEl = $('fs-tema'); 
+    if (temaEl) {
+       for (let i=0; i<temaEl.options.length; i++) {
+           if (temaEl.options[i].value === 'Feria del Libro') {
+               temaEl.selectedIndex = i;
+               break;
+           }
+       }
+    }
 
     if (showThanks) {
       // Mostrar pantalla de agradecimiento breve

@@ -118,23 +118,49 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ session, currentUser, onExit
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!inputText.trim()) return;
+        const text = inputText.trim();
+        if (!text) return;
 
-        // Pasar volunteerId si es un voluntario enviando el mensaje
-        await supabaseService.sendMessage(
-            session.id,
-            currentUser,
-            inputText,
-            currentUser === 'volunteer' ? currentVolunteerId : undefined
-        );
+        // 1. Optimistic UI: clean input right away
         setInputText('');
 
-        // Immediate refresh
-        const { data } = await supabaseService.getMessages(session.id);
-        if (data) setMessages(data as Message[]);
+        // 2. Insert temporary message in view
+        const tempMsg: Message = {
+            id: 'temp-' + Date.now(),
+            sessionId: session.id,
+            sender: currentUser,
+            text,
+            timestamp: new Date().toISOString(),
+            volunteer_id: currentUser === 'volunteer' ? currentVolunteerId : undefined
+        };
+        setMessages(prev => [...prev, tempMsg]);
+        
+        // 3. Keep focus
+        setTimeout(() => inputRef.current?.focus(), 10);
 
-        // Keep input focused after sending
-        inputRef.current?.focus();
+        // 4. Heavy DB actions in background (non-blocking for UI)
+        try {
+            await supabaseService.sendMessage(
+                session.id,
+                currentUser,
+                text,
+                currentUser === 'volunteer' ? currentVolunteerId : undefined
+            );
+
+            // Refetch quietly 
+            const { data } = await supabaseService.getMessages(session.id);
+            if (data) {
+                setMessages(prev => {
+                    const newMessages = data as Message[];
+                    if (prev.length === newMessages.length && (prev.length === 0 || prev[prev.length - 1].id === newMessages[newMessages.length - 1].id)) {
+                        return prev;
+                    }
+                    return newMessages;
+                });
+            }
+        } catch (error) {
+            console.error("Error sending message:", error);
+        }
     };
 
     return (

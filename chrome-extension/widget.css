@@ -56,6 +56,7 @@
     background: transparent;
     box-shadow: none;
     overflow: visible;
+    bottom: 54px; /* 30px higher than 24px */
 }
 
 /* ══════════════════ BURBUJA FLOTANTE ══════════════════ */
@@ -205,7 +206,6 @@
     background: #fff;
 }
 
-/* ══════════════════ FORMULARIO ══════════════════ */
 #fs-view-form {
     padding: 32px 28px;
     background: #f8fafc;
@@ -214,7 +214,7 @@
 #fs-form {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 24px;
 }
 
 .fs-form-title {
@@ -232,7 +232,7 @@
 .fs-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 16px;
+    gap: 20px;
 }
 
 .fs-g {
@@ -530,8 +530,37 @@
     justify-content: flex-start;
 }
 
-.fs-bubble {
+.fs-msg-body {
+    display: flex;
+    flex-direction: column;
     max-width: 85%;
+}
+
+.fs-msg-user .fs-msg-body {
+    align-items: flex-end;
+}
+
+.fs-msg-vol .fs-msg-body {
+    align-items: flex-start;
+}
+
+.fs-msg-header {
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    margin-bottom: 4px;
+    margin-left: 2px;
+}
+
+.fs-msg-time {
+    font-size: 10px;
+    color: #94a3b8;
+    margin-top: 4px;
+    margin-right: 2px;
+    margin-left: 2px;
+}
+
+.fs-bubble {
     padding: 12px 16px;
     font-size: 15px;
     line-height: 1.5;
