@@ -317,6 +317,22 @@ class SupabaseService {
         return { data: { ...volunteer, status: 'online' }, error: null };
     }
 
+    async onAuthStateChange(callback: (event: string, session: any) => void) {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            callback(event, session);
+        });
+        return subscription;
+    }
+
+    async updatePassword(newPassword: string) {
+        const { data, error } = await supabase.auth.updateUser({
+            password: newPassword
+        });
+
+        if (error) return { error: error.message };
+        return { success: true };
+    }
+
     async register(data: { email: string; password?: string; nombre: string }) {
         if (!data.password) return { data: null, error: 'Se requiere contraseña' };
 
@@ -624,6 +640,117 @@ class SupabaseService {
             },
             error: userCountResp.error || missionaryCountResp.error
         };
+    }
+    
+    // --- SHIFT MANAGEMENT (GUARDIAS) ---
+
+    async getShifts(startDate: string, endDate: string) {
+        const { data, error } = await supabase
+            .from('shifts')
+            .select('*, volunteer:volunteers(nombre, email)')
+            .gte('date', startDate)
+            .lte('date', endDate);
+        return { data: data || [], error };
+    }
+
+    async createShift(shift: { volunteer_id: string; date: string; start_time?: string; end_time?: string }) {
+        const { data, error } = await supabase.from('shifts').insert(shift).select().single();
+        return { data, error };
+    }
+
+    async deleteShift(id: string) {
+        const { error } = await supabase.from('shifts').delete().eq('id', id);
+        return { error };
+    }
+
+    async recordLogin(volunteerId: string) {
+        const today = new Date().toLocaleDateString('en-CA');
+        // Using upsert or manually checking to avoid duplicate key errors.
+        // Supabase has upsert, but we need to ignore conflicts on (volunteer_id, date) if we don't want to update first_login_at
+        const { error } = await supabase.from('volunteer_logins').upsert({
+            volunteer_id: volunteerId,
+            date: today,
+        }, { onConflict: 'volunteer_id,date', ignoreDuplicates: true });
+        
+        if (error) console.error("Error recording login:", error);
+    }
+
+    async getVolunteerMetrics(startDate: string, endDate: string, volunteers: Volunteer[]) {
+        // 1. Get Shifts
+        const shiftsRes = await supabase.from('shifts').select('*').gte('date', startDate).lte('date', endDate);
+        const shifts = shiftsRes.data || [];
+
+        // 2. Get Logins
+        const loginsRes = await supabase.from('volunteer_logins').select('*').gte('date', startDate).lte('date', endDate);
+        const logins = loginsRes.data || [];
+
+        // 3. Get Sessions to calculate attended (Need history sessions attended by them)
+        const sessionsRes = await supabase.from('sessions')
+            .select('volunteered_by:voluntario_id, fecha_ingreso')
+            .in('estado', ['finalizado'])
+            .gte('fecha_ingreso', startDate)
+            // Note: date logic here can be tricky due to timezones, but we'll approximate based on date prefix. 
+            // In a real app we might need exact boundaries. We'll add one day to end date to fetch all.
+            .lte('fecha_ingreso', endDate + 'T23:59:59Z');
+        
+        const attendedSessions = sessionsRes.data || [];
+
+        // Build Indicators
+        const indicators: Record<string, any> = {};
+        
+        volunteers.forEach(v => {
+            indicators[v.id] = {
+                volunteerId: v.id,
+                volunteerName: v.nombre,
+                days: {}
+            };
+        });
+
+        // Initialize Days within the range (using local time parsing)
+        const [sYear, sMonth, sDay] = startDate.split('-').map(Number);
+        const [eYear, eMonth, eDay] = endDate.split('-').map(Number);
+        const start = new Date(sYear, sMonth - 1, sDay);
+        const end = new Date(eYear, eMonth - 1, eDay);
+        
+        for(let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+           const dateStr = d.toLocaleDateString('en-CA');
+           Object.values(indicators).forEach(ind => {
+               ind.days[dateStr] = { hasShift: false, loggedIn: false, sessionsAttended: 0 };
+           });
+        }
+
+        // Apply logic
+        shifts.forEach(s => {
+            if (indicators[s.volunteer_id] && indicators[s.volunteer_id].days[s.date]) {
+                indicators[s.volunteer_id].days[s.date].hasShift = true;
+            }
+        });
+
+        logins.forEach(l => {
+            if (indicators[l.volunteer_id] && indicators[l.volunteer_id].days[l.date]) {
+                indicators[l.volunteer_id].days[l.date].loggedIn = true;
+            }
+        });
+
+        attendedSessions.forEach(ses => {
+            const dateOnly = new Date(ses.fecha_ingreso).toLocaleDateString('en-CA');
+            const vId = ses.volunteered_by;
+            if (vId && indicators[vId] && indicators[vId].days[dateOnly]) {
+                 indicators[vId].days[dateOnly].sessionsAttended++;
+            }
+        });
+
+        return indicators;
+    }
+
+    async getDetailedSessionsByDay(date: string) {
+        const { data, error } = await supabase
+            .from('sessions')
+            .select('volunteered_by:voluntario_id, nombre, apellido, fecha_ingreso, estado')
+            .eq('estado', 'finalizado')
+            .gte('fecha_ingreso', date + 'T00:00:00Z')
+            .lte('fecha_ingreso', date + 'T23:59:59Z');
+        return { data: data || [], error };
     }
 
 

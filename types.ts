@@ -61,3 +61,25 @@ export interface Topic {
   active: boolean;
   created_at: string;
 }
+
+export interface Shift {
+  id: string;
+  volunteer_id: string;
+  date: string; // YYYY-MM-DD
+  start_time?: string;
+  end_time?: string;
+  created_at?: string;
+  volunteer?: Volunteer; // Joined data
+}
+
+export interface VolunteerIndicator {
+  volunteerId: string;
+  volunteerName: string;
+  days: {
+    [date: string]: {
+      hasShift: boolean;
+      loggedIn: boolean;
+      sessionsAttended: number;
+    }
+  };
+}

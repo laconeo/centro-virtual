@@ -184,6 +184,9 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
 
     // Set status to online on mount
     supabaseService.updateVolunteerStatus(volunteer.id, 'online');
+    
+    // Record login for guardias indicators
+    supabaseService.recordLogin(volunteer.id);
 
     // Counter for slower polling
     let tickCount = 0;

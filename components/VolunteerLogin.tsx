@@ -9,19 +9,21 @@ import { supabaseService } from '../services/supabaseService';
 interface LoginProps {
   onLoginSuccess: (volunteer: Volunteer) => void;
   onBack: () => void;
+  initialView?: ViewState;
 }
 
-type ViewState = 'login' | 'register' | 'recover';
+type ViewState = 'login' | 'register' | 'recover' | 'reset';
 
-export const VolunteerLogin: React.FC<LoginProps> = ({ onLoginSuccess, onBack }) => {
+export const VolunteerLogin: React.FC<LoginProps> = ({ onLoginSuccess, onBack, initialView = 'login' }) => {
   const { t } = useLanguage();
-  const [view, setView] = useState<ViewState>('login');
+  const [view, setView] = useState<ViewState>(initialView);
   const [loading, setLoading] = useState(false);
 
   // Form States
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [nombre, setNombre] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,6 +93,38 @@ export const VolunteerLogin: React.FC<LoginProps> = ({ onLoginSuccess, onBack })
     }
   };
 
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (password !== confirmPassword) {
+      toast.error("Las contraseñas no coinciden");
+      return;
+    }
+
+    if (password.length < 6) {
+      toast.error("La contraseña debe tener al menos 6 caracteres");
+      return;
+    }
+
+    setLoading(true);
+    const { success, error } = await supabaseService.updatePassword(password);
+    setLoading(false);
+
+    if (success) {
+      toast.success("Contraseña actualizada exitosamente.");
+      // After password update, Supabase keeps the user logged in.
+      // We should fetch the profile and proceed.
+      const vol = await supabaseService.getCurrentVolunteer();
+      if (vol) {
+        onLoginSuccess(vol);
+      } else {
+        setView('login');
+      }
+    } else {
+      toast.error(error || "Error al actualizar contraseña");
+    }
+  };
+
   return (
     <Layout title={t('login_title')} showBack onBack={onBack}>
       <div className="max-w-md mx-auto bg-white p-8 rounded-lg shadow-[var(--shadow-card)] mt-10 animate-fade-in relative">
@@ -101,11 +135,13 @@ export const VolunteerLogin: React.FC<LoginProps> = ({ onLoginSuccess, onBack })
             {view === 'login' && <User className="w-8 h-8" />}
             {view === 'register' && <UserPlus className="w-8 h-8" />}
             {view === 'recover' && <KeyRound className="w-8 h-8" />}
+            {view === 'reset' && <KeyRound className="w-8 h-8" />}
           </div>
           <h2 className="text-xl font-bold text-gray-800">
             {view === 'login' && t('login_header')}
             {view === 'register' && t('register_header')}
             {view === 'recover' && t('recover_header')}
+            {view === 'reset' && "Nueva Contraseña"}
           </h2>
         </div>
 
@@ -256,6 +292,59 @@ export const VolunteerLogin: React.FC<LoginProps> = ({ onLoginSuccess, onBack })
               {loading ? t('btn_sending') : (
                 <>
                   <KeyRound className="w-4 h-4" /> {t('btn_send_link')}
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setView('login')}
+              className="w-full mt-4 text-sm text-gray-500 hover:text-gray-700 flex items-center justify-center gap-1"
+            >
+              <ArrowLeft className="w-4 h-4" /> {t('back_to_login')}
+            </button>
+          </form>
+        )}
+
+        {/* RESET PASSWORD FORM */}
+        {view === 'reset' && (
+          <form onSubmit={handleResetPassword} className="space-y-4">
+            <p className="text-sm text-gray-600 mb-4 text-center">
+              Ingresa tu nueva contraseña a continuación.
+            </p>
+            <div>
+              <label className="block text-sm font-medium mb-1 text-gray-700">Nueva Contraseña</label>
+              <input
+                type="password"
+                required
+                minLength={6}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                className="w-full border border-gray-300 rounded p-2"
+                placeholder="Mínimo 6 caracteres"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1 text-gray-700">Confirmar Nueva Contraseña</label>
+              <input
+                type="password"
+                required
+                minLength={6}
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                className="w-full border border-gray-300 rounded p-2"
+                placeholder="Repite tu contraseña"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn-primary w-full flex justify-center items-center gap-2 cursor-pointer"
+            >
+              {loading ? "Actualizando..." : (
+                <>
+                  <KeyRound className="w-4 h-4" /> Guardar Contraseña
                 </>
               )}
             </button>

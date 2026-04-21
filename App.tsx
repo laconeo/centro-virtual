@@ -40,6 +40,29 @@ function App() {
     initRoute();
   }, []);
 
+  // Auth Listener for recovery
+  React.useEffect(() => {
+    let subscription: any;
+
+    const setupAuth = async () => {
+      subscription = await supabaseService.onAuthStateChange(async (event, session) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          setView('volunteer-login');
+          // We can use a small delay or a ref to ensure the view is ready
+          // But since view state change triggers re-render, it should be fine
+        }
+      });
+    };
+
+    setupAuth();
+
+    return () => {
+      if (subscription && typeof subscription.unsubscribe === 'function') {
+        subscription.unsubscribe();
+      }
+    };
+  }, []);
+
   // Navigation handlers
   const goHome = () => {
     setView('home');
@@ -62,9 +85,15 @@ function App() {
 
   // Render Views
   if (view === 'volunteer-login') {
+    // Detect if we are in recovery mode via hash or session
+    const isRecovery = window.location.hash.includes('type=recovery');
     return (
       <>
-        <VolunteerLogin onLoginSuccess={handleVolunteerLogin} onBack={goHome} />
+        <VolunteerLogin
+          onLoginSuccess={handleVolunteerLogin}
+          onBack={goHome}
+          initialView={isRecovery ? 'reset' : 'login'}
+        />
         <Toaster position="top-right" />
       </>
     );

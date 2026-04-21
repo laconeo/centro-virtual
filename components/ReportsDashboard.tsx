@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabaseService } from '../services/supabaseService';
-import { UserSession, SatisfactionSurvey } from '../types';
-import { X, Calendar, Download, BarChart2, PieChart, Clock, Star, Users, Video, MessageSquare, Activity, DownloadCloud } from 'lucide-react';
+import { UserSession, SatisfactionSurvey, Volunteer, VolunteerIndicator } from '../types';
+import { X, Calendar, Download, BarChart2, PieChart, Clock, Star, Users, Video, MessageSquare, Activity, DownloadCloud, ShieldAlert, CheckCircle, XCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface ReportsDashboardProps {
@@ -25,7 +25,10 @@ const GlobeIcon = (props: any) => (
 export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ onClose }) => {
     const [sessions, setSessions] = useState<UserSession[]>([]);
     const [surveys, setSurveys] = useState<SatisfactionSurvey[]>([]);
+    const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
+    const [indicators, setIndicators] = useState<Record<string, VolunteerIndicator>>({});
     const [loading, setLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState<'general' | 'volunteers'>('general');
 
     // Default to last 30 days
     const today = new Date();
@@ -45,14 +48,22 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ onClose }) =
         setLoading(true);
         const sessionRes = await supabaseService.getReportData(startDate, endDate);
         const surveyRes = await supabaseService.getSurveys();
+        const volRes = await supabaseService.getAllVolunteers();
 
         if (sessionRes.data) setSessions(sessionRes.data as UserSession[]);
-        if (surveyRes.data) {
+        if (surveyRes.data && sessionRes.data) {
             // Filter surveys that belong to the fetched sessions
-            const sessionIds = new Set(sessionRes.data?.map(s => s.id));
+            const sessionIds = new Set(sessionRes.data.map(s => s.id));
             const filteredSurveys = (surveyRes.data as SatisfactionSurvey[]).filter(s => sessionIds.has(s.sesion_id));
             setSurveys(filteredSurveys);
         }
+        
+        if (volRes.data) {
+            setVolunteers(volRes.data as Volunteer[]);
+            const metrics = await supabaseService.getVolunteerMetrics(startDate, endDate, volRes.data as Volunteer[]);
+            setIndicators(metrics);
+        }
+        
         setLoading(false);
     };
 
@@ -267,9 +278,26 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ onClose }) =
                 ) : (
                     <div className="max-w-7xl mx-auto space-y-6">
 
+                        {/* Tabs */}
+                        <div className="flex border-b border-gray-200 mb-6 font-medium">
+                            <button
+                                className={`px-5 py-3 text-sm border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'general' ? 'border-[var(--color-fs-blue)] text-[var(--color-fs-blue)]' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+                                onClick={() => setActiveTab('general')}
+                            >
+                                <PieChart className="w-4 h-4" /> Resumen General
+                            </button>
+                            <button
+                                className={`px-5 py-3 text-sm border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'volunteers' ? 'border-[var(--color-fs-blue)] text-[var(--color-fs-blue)]' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+                                onClick={() => setActiveTab('volunteers')}
+                            >
+                                <Users className="w-4 h-4" /> Rendimiento de Voluntarios
+                            </button>
+                        </div>
 
-                        {/* KPI Cards */}
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        {activeTab === 'general' && (
+                            <div className="space-y-6 animate-fade-in">
+                                {/* KPI Cards */}
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                             <div className="bg-white p-6 rounded-lg shadow-sm border-l-4 border-[var(--color-fs-tree)] animate-slide-up" style={{ animationDelay: '0ms' }}>
                                 <div className="flex justify-between items-start mb-4">
                                     <div>
@@ -522,9 +550,192 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ onClose }) =
                         </div>
 
 
-                        <div className="bg-[var(--color-fs-bg-alt)] border border-[var(--color-fs-border)] p-4 rounded text-center text-[var(--color-fs-text-secondary)] text-sm">
-                            <Clock className="w-4 h-4 inline-block mr-2 text-[var(--color-fs-blue)]" /> Franja horaria de servicio detectada: <span className="font-bold text-[var(--color-fs-text)]">{timeRange}</span>
                         </div>
+                        )}
+
+                        {activeTab === 'volunteers' && (
+                            <div className="space-y-6 animate-fade-in">
+                                {/* VOLUNTEERS SUMMARY STATS */}
+                                {(() => {
+                                    const volunteerStats = volunteers.map(vol => {
+                                        const ind = indicators[vol.id];
+                                        let totalShifts = 0;
+                                        let metAuth = 0;
+                                        let missedShifts = 0;
+                                        
+                                        if (ind) {
+                                            Object.values(ind.days).forEach(day => {
+                                                if (day.hasShift) {
+                                                    totalShifts++;
+                                                    if (day.loggedIn) metAuth++;
+                                                    else missedShifts++;
+                                                }
+                                            });
+                                        }
+
+                                        const vsessions = filteredSessions.filter(s => s.voluntario_id === vol.id && s.estado === 'finalizado');
+                                        const sessionsHandledCount = vsessions.length;
+                                        
+                                        const avgDuration = vsessions.length 
+                                           ? Math.round(vsessions.reduce((acc, s) => acc + (s.duracion_conversacion_minutos || 0), 0) / vsessions.length) 
+                                           : 0;
+
+                                        return {
+                                            id: vol.id,
+                                            name: vol.nombre,
+                                            email: vol.email,
+                                            shifts: totalShifts,
+                                            attendedAuth: metAuth,
+                                            absentPoints: missedShifts,
+                                            casesHandled: sessionsHandledCount,
+                                            avgResolutionTime: avgDuration,
+                                            attendanceRate: totalShifts > 0 ? Math.round((metAuth / totalShifts) * 100) : 0
+                                        };
+                                    }).filter(v => v.shifts > 0 || v.casesHandled > 0);
+
+                                    const topVolunteersByCases = [...volunteerStats].sort((a,b) => b.casesHandled - a.casesHandled).slice(0, 5);
+                                    const maxCases = Math.max(...topVolunteersByCases.map(v => v.casesHandled), 1);
+                                    
+                                    const totalAssignedShifts = volunteerStats.reduce((sum, v) => sum + v.shifts, 0);
+                                    const totalAttendedShifts = volunteerStats.reduce((sum, v) => sum + v.attendedAuth, 0);
+                                    const globalAttendanceRate = totalAssignedShifts > 0 ? Math.round((totalAttendedShifts / totalAssignedShifts) * 100) : 0;
+
+                                    return (
+                                        <div className="space-y-6">
+                                            {/* Gráficos de Voluntarios */}
+                                            {volunteerStats.length > 0 && (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                    {/* Top 5 Voluntarios */}
+                                                    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                                                        <h4 className="font-medium text-[var(--color-fs-text)] mb-6 flex items-center gap-2 border-b pb-2 border-gray-100">
+                                                            <BarChart2 className="w-4 h-4 text-[var(--color-fs-blue)]" /> Top 5 - Casos Atendidos
+                                                        </h4>
+                                                        <div className="space-y-4">
+                                                            {topVolunteersByCases.map((vol) => (
+                                                                <div key={vol.id}>
+                                                                    <div className="flex justify-between text-sm mb-1.5">
+                                                                        <span className="text-[var(--color-fs-text-secondary)] truncate w-40" title={vol.name}>{vol.name}</span>
+                                                                        <span className="font-bold text-[var(--color-fs-text)]">{vol.casesHandled} casos</span>
+                                                                    </div>
+                                                                    <div className="w-full bg-gray-100 rounded-sm h-3 overflow-hidden">
+                                                                        <div 
+                                                                            className="h-full rounded-sm bg-[var(--color-fs-blue)]"
+                                                                            style={{ width: `${(vol.casesHandled / maxCases) * 100}%`, minWidth: '4px' }}
+                                                                        ></div>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Resumen de Asistencia */}
+                                                    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 flex flex-col justify-center items-center">
+                                                        <h4 className="font-medium text-[var(--color-fs-text)] mb-6 w-full flex items-center gap-2 border-b pb-2 border-gray-100">
+                                                            <PieChart className="w-4 h-4 text-[var(--color-fs-tree)]" /> Tasa de Asistencia Global
+                                                        </h4>
+                                                        <div className="relative w-32 h-32 flex items-center justify-center">
+                                                            {/* SVG Donut Chart */}
+                                                            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                                                                {/* Background circle */}
+                                                                <path
+                                                                    className="text-gray-100"
+                                                                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                                                    fill="none"
+                                                                    stroke="currentColor"
+                                                                    strokeWidth="4"
+                                                                />
+                                                                {/* Value circle */}
+                                                                <path
+                                                                    className={`${globalAttendanceRate >= 80 ? 'text-[#8CB83E]' : globalAttendanceRate >= 50 ? 'text-orange-400' : 'text-red-500'}`}
+                                                                    strokeDasharray={`${globalAttendanceRate}, 100`}
+                                                                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                                                                    fill="none"
+                                                                    stroke="currentColor"
+                                                                    strokeWidth="4"
+                                                                />
+                                                            </svg>
+                                                            <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                                                <span className="text-2xl font-bold text-[var(--color-fs-text)]">{globalAttendanceRate}%</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="mt-4 text-center text-xs text-gray-500">
+                                                            <div>Guardias Totales: <span className="font-bold text-gray-700">{totalAssignedShifts}</span></div>
+                                                            <div>Guardias Cumplidas: <span className="font-bold text-green-600">{totalAttendedShifts}</span></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                                            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                                                <h4 className="font-medium text-[var(--color-fs-text)] flex items-center gap-2">
+                                                    <Users className="w-5 h-5 text-[var(--color-fs-tree)]" /> Desglose de Guardias
+                                                </h4>
+                                                <div className="text-xs text-gray-500">Periodo actual vs Guardias asignadas</div>
+                                            </div>
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-left text-sm whitespace-nowrap">
+                                                    <thead className="bg-[#f0f4f8] text-[var(--color-fs-text-secondary)] uppercase text-[10px] font-bold">
+                                                        <tr>
+                                                            <th className="px-6 py-4">Voluntario</th>
+                                                            <th className="px-6 py-4 text-center">Tasa Asistencia</th>
+                                                            <th className="px-6 py-4 text-center">Faltas (Pts)</th>
+                                                            <th className="px-6 py-4 text-center">Casos Atendidos</th>
+                                                            <th className="px-6 py-4 text-center">Tiempo Promedio (min)</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-gray-100">
+                                                        {volunteerStats.length === 0 ? (
+                                                            <tr>
+                                                                <td colSpan={5} className="px-6 py-8 text-center text-gray-400 italic">No hay actividad de voluntarios para este periodo.</td>
+                                                            </tr>
+                                                        ) : (
+                                                            volunteerStats.sort((a,b) => b.casesHandled - a.casesHandled).map(stat => (
+                                                                <tr key={stat.id} className="hover:bg-gray-50 transition-colors group">
+                                                                    <td className="px-6 py-4">
+                                                                        <div className="font-bold text-[var(--color-fs-text)]">{stat.name}</div>
+                                                                        <div className="text-[10px] text-gray-400">{stat.email}</div>
+                                                                        <div className="text-[10px] text-[var(--color-fs-text-secondary)] mt-1">Guardias asignadas: {stat.shifts}</div>
+                                                                    </td>
+                                                                    <td className="px-6 py-4 text-center">
+                                                                        <div className="flex items-center justify-center gap-2">
+                                                                            <span className={`font-bold ${stat.attendanceRate >= 80 ? 'text-[#8CB83E]' : stat.attendanceRate >= 50 ? 'text-orange-500' : 'text-red-500'}`}>
+                                                                                {stat.attendanceRate}%
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="text-[10px] text-gray-400 mt-1">{stat.attendedAuth} / {stat.shifts} completadas</div>
+                                                                    </td>
+                                                                    <td className="px-6 py-4 text-center">
+                                                                        {stat.absentPoints > 0 ? (
+                                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-600 font-bold text-xs">
+                                                                                <ShieldAlert className="w-3 h-3" /> {stat.absentPoints}
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-bold text-xs">
+                                                                                <CheckCircle className="w-3 h-3" /> 0
+                                                                            </span>
+                                                                        )}
+                                                                    </td>
+                                                                    <td className="px-6 py-4 text-center">
+                                                                        <span className="inline-flex items-center justify-center min-w-[30px] rounded-full bg-blue-50 text-[var(--color-fs-blue)] font-bold px-2 py-1">
+                                                                            {stat.casesHandled}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="px-6 py-4 text-center text-[var(--color-fs-text)] font-medium">
+                                                                        {stat.avgResolutionTime} min
+                                                                    </td>
+                                                                </tr>
+                                                            ))
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    );
+                                })()}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
