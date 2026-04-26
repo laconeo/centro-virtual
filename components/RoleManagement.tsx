@@ -81,7 +81,7 @@ export const RoleManagement: React.FC = () => {
                         <input
                             type="text"
                             className="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-blue-100"
-                            placeholder="Ej: Lider de Turno"
+                            placeholder="Ej: Lider de Grupo"
                             value={formData.name}
                             onChange={e => setFormData({ ...formData, name: e.target.value })}
                         />
@@ -104,7 +104,7 @@ export const RoleManagement: React.FC = () => {
                             checked={formData.is_leader}
                             onChange={e => setFormData({ ...formData, is_leader: e.target.checked })}
                         />
-                        <label htmlFor="is_leader" className="text-sm text-gray-700 font-medium">¿Es Líder de Turno?</label>
+                        <label htmlFor="is_leader" className="text-sm text-gray-700 font-medium">¿Es Líder de Grupo?</label>
                     </div>
                     <div className="flex gap-2">
                         {editingId && (

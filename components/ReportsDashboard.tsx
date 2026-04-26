@@ -23,12 +23,27 @@ const GlobeIcon = (props: any) => (
 );
 
 export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ onClose }) => {
+    // UTC-3 (America/Argentina/Buenos_Aires) timezone helpers
+    const toUTC3DateStr = (isoString: string): string => {
+        const date = new Date(isoString);
+        // Shift by -3 hours (UTC-3 = UTC - 3h)
+        const utc3 = new Date(date.getTime() - 3 * 60 * 60 * 1000);
+        return utc3.toISOString().split('T')[0]; // YYYY-MM-DD in UTC-3
+    };
+    const toUTC3Hour = (isoString: string): number => {
+        const date = new Date(isoString);
+        const utc3 = new Date(date.getTime() - 3 * 60 * 60 * 1000);
+        return utc3.getUTCHours();
+    };
+
     const [sessions, setSessions] = useState<UserSession[]>([]);
     const [surveys, setSurveys] = useState<SatisfactionSurvey[]>([]);
     const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
     const [indicators, setIndicators] = useState<Record<string, VolunteerIndicator>>({});
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'general' | 'volunteers'>('general');
+    const [totalExactCount, setTotalExactCount] = useState(0);
+    const [attendedExactCount, setAttendedExactCount] = useState(0);
 
     // Default to last 30 days
     const today = new Date();
@@ -49,6 +64,13 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ onClose }) =
         const sessionRes = await supabaseService.getReportData(startDate, endDate);
         const surveyRes = await supabaseService.getSurveys();
         const volRes = await supabaseService.getAllVolunteers();
+
+        // Fetch exact counts for KPIs to bypass array limits
+        const totalCountRes = await supabaseService.getSessionsCount(startDate, endDate);
+        const attendedCountRes = await supabaseService.getSessionsCount(startDate, endDate, 'finalizado');
+
+        if (totalCountRes.count !== undefined) setTotalExactCount(totalCountRes.count);
+        if (attendedCountRes.count !== undefined) setAttendedExactCount(attendedCountRes.count);
 
         if (sessionRes.data) setSessions(sessionRes.data as UserSession[]);
         if (surveyRes.data && sessionRes.data) {
@@ -90,8 +112,8 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ onClose }) =
         ? (surveys.reduce((acc, s) => acc + s.calificacion, 0) / surveys.length).toFixed(1)
         : 'N/A';
 
-    // Time Components
-    const sessionHours = filteredSessions.map(s => new Date(s.fecha_ingreso).getHours());
+    // Time Components (using UTC-3)
+    const sessionHours = filteredSessions.map(s => toUTC3Hour(s.fecha_ingreso));
 
     const minHour = sessionHours.length ? Math.min(...sessionHours) : 0;
     const maxHour = sessionHours.length ? Math.max(...sessionHours) : 0;
@@ -143,12 +165,15 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ onClose }) =
     // If 'Video' is selected, maybe show only Video bar? 
     // Let's stick to showing BOTH in the evolution chart always for comparison as requested "chat AND video during the month".
 
-    // Group by Date
+    // Group by Date (using UTC-3 to avoid day-jump at midnight)
     const dailyStats = sessions.reduce((acc, s) => {
-        const date = s.fecha_ingreso.split('T')[0]; // YYYY-MM-DD
+        const date = toUTC3DateStr(s.fecha_ingreso); // YYYY-MM-DD in UTC-3
         if (!acc[date]) acc[date] = { video: 0, chat: 0 };
-        if (s.type === 'video') acc[date].video++;
-        if (s.type === 'chat') acc[date].chat++;
+        // Only count attended cases for this chart as per title
+        if (s.estado === 'finalizado') {
+            if (s.type === 'video') acc[date].video++;
+            if (s.type === 'chat') acc[date].chat++;
+        }
         return acc;
     }, {} as Record<string, { video: number, chat: number }>);
 
@@ -302,14 +327,16 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ onClose }) =
                                 <div className="flex justify-between items-start mb-4">
                                     <div>
                                         <p className="text-[var(--color-fs-text-secondary)] text-xs font-bold uppercase tracking-wider">Casos Atendidos</p>
-                                        <h3 className="text-3xl font-light text-[var(--color-fs-text)] mt-1">{attendedSessions.length}</h3>
+                                        <h3 className="text-3xl font-light text-[var(--color-fs-text)] mt-1">
+                                            {selectedChannel === 'all' ? attendedExactCount : attendedSessions.length}
+                                        </h3>
                                     </div>
                                     <div className="text-[var(--color-fs-tree)]">
                                         <Users className="w-6 h-6" />
                                     </div>
                                 </div>
                                 <div className="text-xs text-[var(--color-fs-text-secondary)] flex justify-between border-t pt-2 mt-2 border-gray-100">
-                                    <span>Total: {totalSessions}</span>
+                                    <span>Total: {selectedChannel === 'all' ? totalExactCount : totalSessions}</span>
                                     <span className="text-red-500 font-medium">No atendidos: {notAttendedSessions.length}</span>
                                 </div>
                             </div>
@@ -598,6 +625,7 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ onClose }) =
                                     
                                     const totalAssignedShifts = volunteerStats.reduce((sum, v) => sum + v.shifts, 0);
                                     const totalAttendedShifts = volunteerStats.reduce((sum, v) => sum + v.attendedAuth, 0);
+                                    const totalCasesHandled = volunteerStats.reduce((sum, v) => sum + v.casesHandled, 0);
                                     const globalAttendanceRate = totalAssignedShifts > 0 ? Math.round((totalAttendedShifts / totalAssignedShifts) * 100) : 0;
 
                                     return (
@@ -658,9 +686,13 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ onClose }) =
                                                                 <span className="text-2xl font-bold text-[var(--color-fs-text)]">{globalAttendanceRate}%</span>
                                                             </div>
                                                         </div>
-                                                        <div className="mt-4 text-center text-xs text-gray-500">
-                                                            <div>Guardias Totales: <span className="font-bold text-gray-700">{totalAssignedShifts}</span></div>
-                                                            <div>Guardias Cumplidas: <span className="font-bold text-green-600">{totalAttendedShifts}</span></div>
+                                                        <div className="mt-4 text-center text-xs text-gray-500 grid grid-cols-2 gap-x-4 gap-y-1">
+                                                            <div className="text-right">Guardias Totales:</div>
+                                                            <div className="text-left font-bold text-gray-700">{totalAssignedShifts}</div>
+                                                            <div className="text-right">Guardias Cumplidas:</div>
+                                                            <div className="text-left font-bold text-green-600">{totalAttendedShifts}</div>
+                                                            <div className="text-right border-t pt-1">Casos Atendidos:</div>
+                                                            <div className="text-left font-bold text-blue-600 border-t pt-1">{totalCasesHandled}</div>
                                                         </div>
                                                     </div>
                                                 </div>

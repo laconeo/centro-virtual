@@ -48,6 +48,7 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
   const [isOnlineOpen, setIsOnlineOpen] = useState(false);
   const [isLangOpen, setIsLangOpen] = useState(false);
   const [isReportsOpen, setIsReportsOpen] = useState(false);
+  const [totalExactCount, setTotalExactCount] = useState(0);
 
 
   const fetchData = async () => {
@@ -58,6 +59,10 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
     // Fetch History
     const historyRes = await supabaseService.getHistory();
     if (historyRes.data) setHistorySessions(historyRes.data as UserSession[]);
+
+    // Fetch EXACT total count from DB to avoid row-limit cap
+    const countRes = await supabaseService.getSessionsCount();
+    setTotalExactCount(countRes.count);
 
     const surveyRes = await supabaseService.getSurveys();
     if (surveyRes.data) setSurveys(surveyRes.data as SatisfactionSurvey[]);
@@ -211,9 +216,9 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
         const surveyRes = await supabaseService.getSurveys();
         if (surveyRes.data) setSurveys(surveyRes.data as SatisfactionSurvey[]);
 
-        // Optional: Poll history too if we want to see other people's finished sessions eventually
-        // const histRes = await supabaseService.getHistory();
-        // if (histRes.data) setHistorySessions(histRes.data as UserSession[]);
+        // Refresh exact total count
+        const countRes = await supabaseService.getSessionsCount();
+        setTotalExactCount(countRes.count);
       }
 
       // Poll Volunteers (Fast-ish: 3s) - Needed for 'Online' status accuracy
@@ -291,7 +296,14 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
             supabaseService.updateVolunteerStatus(volunteer.id, 'busy');
             setCurrentStatus('busy');
           } else if (res.data.estado === 'en_atencion') {
-            toast.error("Esta sesión ya está siendo atendida por otro voluntario.");
+            if (volunteer.role?.is_leader) {
+              setActiveSession(res.data);
+              supabaseService.updateVolunteerStatus(volunteer.id, 'busy');
+              setCurrentStatus('busy');
+              toast.success("Uniéndote a la conversación como líder de grupo");
+            } else {
+              toast.error("Esta sesión ya está siendo atendida por otro voluntario.");
+            }
           } else {
             toast.error("Esta sesión ya no está disponible (" + res.data.estado + ").");
           }
@@ -384,7 +396,8 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
   };
 
   // --- Statistics ---
-  const totalSesiones = sessions.length;
+  // Use exact DB count for total to avoid row-fetch limits (was stalling at 1000)
+  const totalSesiones = totalExactCount || sessions.length;
   const waitingCount = sessions.filter(s => s.estado === 'esperando').length;
   // The header has a badge with `onlineCount`. Feature request says "esquina superior derecha".
   // So I will implement a dropdown for the `onlineCount` badge to show online volunteers.
@@ -758,13 +771,16 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
                           >
                             {t('dashboard_btn_resume')} <Play className="w-3 h-3" />
                           </button>
-                        ) : (
+                        ) : volunteer.role?.is_leader ? (
                           <button
                             onClick={() => setActiveSession(s)}
                             className="text-[var(--color-fs-blue)] hover:text-[var(--color-fs-blue-hover)] font-bold text-xs uppercase cursor-pointer hover:underline flex items-center justify-end gap-1 w-full"
+                            title="Solo líderes de grupo pueden unirse a sesiones en curso"
                           >
                             {t('dashboard_btn_help')} <Users className="w-3 h-3" />
                           </button>
+                        ) : (
+                          <span className="text-gray-300 text-xs italic">En atención</span>
                         )}
                       </td>
                     </tr>

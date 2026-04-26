@@ -108,7 +108,10 @@ class SupabaseService {
             query = query.in('estado', ['esperando', 'en_atencion', 'abandonado', 'finalizado']);
         }
 
-        const { data, error } = await query.order('fecha_ingreso', { ascending: true }); // Oldest first for queue
+        // Supabase default cap is 1000 rows — use limit(5000) to avoid truncating large datasets
+        const { data, error } = await query
+            .order('fecha_ingreso', { ascending: true })
+            .limit(5000);
 
         if (error) {
             console.error('Error fetching sessions:', error);
@@ -123,7 +126,8 @@ class SupabaseService {
             .from('sessions')
             .select('*')
             .in('estado', ['abandonado', 'finalizado'])
-            .order('fecha_ingreso', { ascending: false });
+            .order('fecha_ingreso', { ascending: false })
+            .limit(5000); // Bypass Supabase's default 1000-row cap
 
         if (error) {
             console.error('Error fetching history:', error);
@@ -140,16 +144,18 @@ class SupabaseService {
             .order('fecha_ingreso', { ascending: false });
 
         if (startDate) {
-            query = query.gte('fecha_ingreso', startDate);
+            // Convert local UTC-3 date to UTC start-of-day boundary
+            query = query.gte('fecha_ingreso', startDate + 'T03:00:00Z');
         }
         if (endDate) {
-            // Add one day to end date to include the full day
+            // End of day in UTC-3 = next day T03:00:00Z in UTC
             const nextDay = new Date(endDate);
             nextDay.setDate(nextDay.getDate() + 1);
-            query = query.lt('fecha_ingreso', nextDay.toISOString());
+            const nextDayStr = nextDay.toISOString().split('T')[0];
+            query = query.lt('fecha_ingreso', nextDayStr + 'T03:00:00Z');
         }
 
-        const { data, error } = await query;
+        const { data, error } = await query.limit(5000); // Bypass Supabase default 1000-row cap
 
         if (error) {
             console.error('Error fetching report data:', error);
@@ -157,6 +163,28 @@ class SupabaseService {
         }
 
         return { data: data.map(this.mapSession), error: null };
+    }
+
+    async getSessionsCount(startDate?: string, endDate?: string, status?: string) {
+        let query = supabase
+            .from('sessions')
+            .select('*', { count: 'exact', head: true });
+
+        if (startDate) {
+            query = query.gte('fecha_ingreso', startDate + 'T03:00:00Z');
+        }
+        if (endDate) {
+            const nextDay = new Date(endDate);
+            nextDay.setDate(nextDay.getDate() + 1);
+            const nextDayStr = nextDay.toISOString().split('T')[0];
+            query = query.lt('fecha_ingreso', nextDayStr + 'T03:00:00Z');
+        }
+        if (status) {
+            query = query.eq('estado', status);
+        }
+
+        const { count, error } = await query;
+        return { count: count || 0, error };
     }
 
     async getSessionById(id: string) {
@@ -266,7 +294,7 @@ class SupabaseService {
 
         const { data: volunteer } = await supabase
             .from('volunteers')
-            .select('*')
+            .select('*, role:roles(*)')
             .eq('email', session.user.email)
             .single();
 
@@ -296,7 +324,7 @@ class SupabaseService {
         // 2. Get Volunteer Profile (or create if missing sync)
         let { data: volunteer, error: profileError } = await supabase
             .from('volunteers')
-            .select('*')
+            .select('*, role:roles(*)')
             .eq('email', email)
             .single();
 
@@ -655,7 +683,8 @@ class SupabaseService {
             .from('shifts')
             .select('*, volunteer:volunteers(nombre, email)')
             .gte('date', startDate)
-            .lte('date', endDate);
+            .lte('date', endDate)
+            .limit(5000); // Avoid default 1000 limit
         return { data: data || [], error };
     }
 
@@ -683,11 +712,11 @@ class SupabaseService {
 
     async getVolunteerMetrics(startDate: string, endDate: string, volunteers: Volunteer[]) {
         // 1. Get Shifts
-        const shiftsRes = await supabase.from('shifts').select('*').gte('date', startDate).lte('date', endDate);
+        const shiftsRes = await supabase.from('shifts').select('*').gte('date', startDate).lte('date', endDate).limit(5000);
         const shifts = shiftsRes.data || [];
 
         // 2. Get Logins
-        const loginsRes = await supabase.from('volunteer_logins').select('*').gte('date', startDate).lte('date', endDate);
+        const loginsRes = await supabase.from('volunteer_logins').select('*').gte('date', startDate).lte('date', endDate).limit(5000);
         const logins = loginsRes.data || [];
 
         // 3. Get Sessions to calculate attended (Need history sessions attended by them)
@@ -697,7 +726,8 @@ class SupabaseService {
             .gte('fecha_ingreso', startDate)
             // Note: date logic here can be tricky due to timezones, but we'll approximate based on date prefix. 
             // In a real app we might need exact boundaries. We'll add one day to end date to fetch all.
-            .lte('fecha_ingreso', endDate + 'T23:59:59Z');
+            .lte('fecha_ingreso', endDate + 'T23:59:59Z')
+            .limit(5000); // Avoid default 1000 limit
         
         const attendedSessions = sessionsRes.data || [];
 
