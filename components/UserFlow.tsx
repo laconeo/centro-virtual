@@ -483,6 +483,7 @@ export const UserFlow: React.FC<UserFlowProps> = ({ onExit, onVolunteerAccess })
             session={sessionData}
             currentUser="user"
             onEndSession={handleUserExit}
+            onSessionClosed={() => setStep('feedback')}
           />
         </div>
       </div>

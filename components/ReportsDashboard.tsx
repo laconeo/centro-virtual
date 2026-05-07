@@ -181,6 +181,31 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ onClose }) =
     const maxDailyCount = sortedDates.reduce((max, date) => Math.max(max, dailyStats[date].video + dailyStats[date].chat), 0); // Scale by max total or max individual? Max individual is better for side-by-side.
     const maxIndividualCount = sortedDates.reduce((max, date) => Math.max(max, dailyStats[date].video, dailyStats[date].chat), 0);
 
+    // --- HOURLY ATTENTION DATA ---
+    // Build a 24-slot array (0..23) for the filtered sessions
+    const hourlyStats: { video: number; chat: number }[] = Array.from({ length: 24 }, () => ({ video: 0, chat: 0 }));
+    filteredSessions.forEach(s => {
+        const h = toUTC3Hour(s.fecha_ingreso);
+        if (s.type === 'video') hourlyStats[h].video++;
+        else hourlyStats[h].chat++;
+    });
+
+    // Determine visible range: only hours with at least 1 ticket (plus 1 padding each side)
+    const activeHours = hourlyStats.map((_, i) => i).filter(i => hourlyStats[i].video + hourlyStats[i].chat > 0);
+    const hourRangeStart = activeHours.length ? Math.max(0, activeHours[0] - 1) : 0;
+    const hourRangeEnd   = activeHours.length ? Math.min(23, activeHours[activeHours.length - 1] + 1) : 23;
+    const visibleHours   = Array.from({ length: hourRangeEnd - hourRangeStart + 1 }, (_, i) => i + hourRangeStart);
+
+    const maxHourlyTotal  = visibleHours.reduce((m, h) => Math.max(m, hourlyStats[h].video + hourlyStats[h].chat), 0);
+    const maxHourlyIndiv  = visibleHours.reduce((m, h) => Math.max(m, hourlyStats[h].video, hourlyStats[h].chat), 0);
+    const avgHourlyTotal  = filteredSessions.length > 0 && visibleHours.length > 0
+        ? filteredSessions.length / visibleHours.length
+        : 0;
+    const peakHour        = visibleHours.reduce((best, h) => {
+        const total = hourlyStats[h].video + hourlyStats[h].chat;
+        return total > (hourlyStats[best]?.video + hourlyStats[best]?.chat || 0) ? h : best;
+    }, visibleHours[0] ?? 0);
+
 
     const handleExportExcel = () => {
         const wb = XLSX.utils.book_new();
@@ -577,8 +602,149 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ onClose }) =
                         </div>
 
 
+                        {/* - - - ROW 3: Hourly Attention Chart (Full Width) - - - */}
+                        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                            <div className="flex items-center justify-between mb-6 border-b pb-2 border-gray-100">
+                                <h4 className="font-medium text-[var(--color-fs-text)] flex items-center gap-2">
+                                    <Clock className="w-4 h-4 text-[var(--color-fs-blue)]" /> Atención por Hora del Día
+                                </h4>
+                                {filteredSessions.length > 0 && (
+                                    <span className="text-xs text-gray-400 bg-gray-50 px-3 py-1 rounded-full border border-gray-200">
+                                        Hora pico: <strong className="text-[var(--color-fs-blue)]">{peakHour}:00–{peakHour + 1}:00</strong>
+                                        &nbsp;·&nbsp;{hourlyStats[peakHour]?.video + hourlyStats[peakHour]?.chat} tickets
+                                    </span>
+                                )}
+                            </div>
+
+                            {filteredSessions.length === 0 ? (
+                                <div className="h-56 flex items-center justify-center text-gray-400 text-sm">
+                                    No hay datos para el periodo seleccionado.
+                                </div>
+                            ) : (
+                                <div className="flex gap-3">
+                                    {/* Y-Axis Labels */}
+                                    <div className="flex flex-col justify-between text-right pr-2 pb-6 w-8 flex-shrink-0">
+                                        {[1, 0.75, 0.5, 0.25, 0].map(tick => (
+                                            <span key={tick} className="text-[10px] text-gray-400 leading-none">
+                                                {Math.round(maxHourlyTotal * tick)}
+                                            </span>
+                                        ))}
+                                    </div>
+
+                                    {/* Chart Area */}
+                                    <div className="flex-1 flex flex-col min-w-0">
+                                        {/* Bars */}
+                                        <div className="relative flex-1 flex items-end gap-[3px] border-b border-l border-gray-200 pb-0 min-h-[200px]">
+                                            {/* Grid lines */}
+                                            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
+                                                {[0, 0.25, 0.5, 0.75, 1].map(tick => (
+                                                    <div key={tick} className="w-full border-t border-gray-100 h-0" />
+                                                ))}
+                                            </div>
+
+                                            {/* Average line */}
+                                            {maxHourlyTotal > 0 && avgHourlyTotal > 0 && (
+                                                <div
+                                                    className="absolute left-0 right-0 border-t-2 border-dashed border-amber-400/70 z-10 pointer-events-none"
+                                                    style={{ bottom: `${(avgHourlyTotal / maxHourlyTotal) * 100}%` }}
+                                                    title={`Promedio: ${avgHourlyTotal.toFixed(1)} tickets/hora`}
+                                                >
+                                                    <span className="absolute right-1 -top-4 text-[9px] font-bold text-amber-500 bg-white px-1 rounded">
+                                                        Prom. {avgHourlyTotal.toFixed(1)}
+                                                    </span>
+                                                </div>
+                                            )}
+
+                                            {/* Hour bars */}
+                                            {visibleHours.map(h => {
+                                                const vid  = hourlyStats[h].video;
+                                                const chat = hourlyStats[h].chat;
+                                                const total = vid + chat;
+                                                const vidH  = maxHourlyIndiv > 0 ? (vid  / maxHourlyIndiv) * 100 : 0;
+                                                const chatH = maxHourlyIndiv > 0 ? (chat / maxHourlyIndiv) * 100 : 0;
+                                                const isPeak = h === peakHour && total > 0;
+
+                                                return (
+                                                    <div
+                                                        key={h}
+                                                        className={`flex-1 flex flex-col justify-end items-center group relative h-full z-10 min-w-[12px] ${isPeak ? 'rounded-t-sm ring-1 ring-amber-300/40' : ''}`}
+                                                    >
+                                                        {/* Tooltip */}
+                                                        {total > 0 && (
+                                                            <div className="opacity-0 group-hover:opacity-100 absolute bottom-full mb-2 left-1/2 -translate-x-1/2 text-[10px] bg-gray-800 text-white px-2 py-1.5 rounded shadow-lg whitespace-nowrap z-30 pointer-events-none hidden md:block">
+                                                                <div className="font-bold mb-0.5">{h}:00 – {h + 1}:00</div>
+                                                                {vid > 0 && <div className="text-blue-300">📹 Video: {vid}</div>}
+                                                                {chat > 0 && <div style={{ color: '#a3d45a' }}>💬 Chat: {chat}</div>}
+                                                                <div className="border-t border-gray-600 mt-0.5 pt-0.5 font-semibold">Total: {total}</div>
+                                                                {/* Tooltip arrow */}
+                                                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800" />
+                                                            </div>
+                                                        )}
+
+                                                        <div className="flex gap-[1px] w-full justify-center items-end h-full px-[1px]">
+                                                            {/* Video bar */}
+                                                            <div
+                                                                className="w-1/2 rounded-t-sm transition-all duration-200 hover:opacity-80"
+                                                                style={{
+                                                                    height: `${Math.max(vidH, vid > 0 ? 2 : 0)}%`,
+                                                                    backgroundColor: '#005994',
+                                                                }}
+                                                                title={`Video: ${vid}`}
+                                                            />
+                                                            {/* Chat bar */}
+                                                            <div
+                                                                className="w-1/2 rounded-t-sm transition-all duration-200 hover:opacity-80"
+                                                                style={{
+                                                                    height: `${Math.max(chatH, chat > 0 ? 2 : 0)}%`,
+                                                                    backgroundColor: '#8CB83E',
+                                                                }}
+                                                                title={`Chat: ${chat}`}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {/* X-Axis Labels */}
+                                        <div className="flex gap-[3px] mt-1 pl-0">
+                                            {visibleHours.map((h, i) => {
+                                                const showLabel = visibleHours.length <= 14
+                                                    || i === 0
+                                                    || i === visibleHours.length - 1
+                                                    || h % 2 === 0;
+                                                return (
+                                                    <div key={h} className="flex-1 text-center min-w-[12px]">
+                                                        {showLabel && (
+                                                            <span className={`text-[9px] leading-none ${h === peakHour && hourlyStats[h].video + hourlyStats[h].chat > 0 ? 'font-bold text-amber-500' : 'text-gray-400'}`}>
+                                                                {h}h
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Legend */}
+                            <div className="flex justify-center gap-6 mt-5 text-xs text-gray-500">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-3 h-3 rounded-sm bg-[var(--color-fs-blue)]" /> Video
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#8CB83E' }} /> Chat
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="w-5 border-t-2 border-dashed border-amber-400" /> Promedio
+                                </div>
+                            </div>
+                        </div>
+
                         </div>
                         )}
+
 
                         {activeTab === 'volunteers' && (
                             <div className="space-y-6 animate-fade-in">

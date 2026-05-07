@@ -220,6 +220,37 @@ class SupabaseService {
         return { data: this.mapSession(data), error: null };
     }
 
+    /**
+     * Reopen a closed/finished session back to the waiting queue.
+     * Used by volunteers who want to resume a conversation.
+     */
+    async reopenSession(id: string, volunteerName: string) {
+        const updates: any = {
+            estado: 'esperando',
+            voluntario_id: null,
+            fecha_atencion: null,
+            fecha_fin: null,
+        };
+
+        const { data, error } = await supabase
+            .from('sessions')
+            .update(updates)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) return { data: null, error };
+
+        // Send a system message so the user sees who reopened the chat
+        await this.sendMessage(
+            id,
+            'system',
+            `El voluntario ${volunteerName} ha devuelto esta conversación a la cola de espera. Un agente estará disponible pronto.`
+        );
+
+        return { data: this.mapSession(data), error: null };
+    }
+
     // --- MESSAGING METHODS ---
 
     async getMessages(sessionId: string, afterTimestamp?: string) {

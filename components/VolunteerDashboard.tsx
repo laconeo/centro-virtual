@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import { useLanguage } from '../src/contexts/LanguageContext';
-import { LogOut, FileSpreadsheet, Users, Video, MessageSquare, RefreshCw, Activity, Clock, CheckCircle, Play, Star, Calendar, Settings, Globe, Power, BarChart2 } from 'lucide-react';
+import { LogOut, FileSpreadsheet, Users, Video, MessageSquare, RefreshCw, Activity, Clock, CheckCircle, Play, Star, Calendar, Settings, Globe, Power, BarChart2, RotateCcw } from 'lucide-react';
 import { Volunteer, UserSession, SatisfactionSurvey } from '../types';
 import { supabaseService } from '../services/supabaseService';
 import { initializeJitsi } from '../services/jitsi';
@@ -318,6 +318,13 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
 
   const handleFinishSession = async () => {
     if (!activeSession) return;
+    // Send a system message so both sides know who closed the chat
+    const closerName = volunteer.nombre;
+    await supabaseService.sendMessage(
+      activeSession.id,
+      'system',
+      `El voluntario ${closerName} ha cerrado el chat.`
+    );
     await supabaseService.updateSessionStatus(activeSession.id, 'finalizado');
 
     // Auto-update status back to online
@@ -326,6 +333,16 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
 
     setActiveSession(null);
     toast.success("Sesión finalizada");
+    fetchData();
+  };
+
+  const handleReopenSession = async (session: UserSession) => {
+    const { data, error } = await supabaseService.reopenSession(session.id, volunteer.nombre);
+    if (error || !data) {
+      toast.error("No se pudo devolver la sesión a la cola");
+      return;
+    }
+    toast.success(`La conversación de ${session.nombre} ${session.apellido} fue devuelta a la cola`);
     fetchData();
   };
 
@@ -838,6 +855,7 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
                     <th className="px-2 py-2 font-medium w-[90px] text-center">Espera / Dur.</th>
                     <th className="px-2 py-2 font-medium w-[14%]">Atendido</th>
                     <th className="px-2 py-2 font-medium w-[100px] text-center">Calificación</th>
+                    <th className="px-2 py-2 font-medium w-[90px] text-center">Acción</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -921,6 +939,21 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
                             </div>
                           ) : (
                             <span className="text-gray-300">-</span>
+                          )}
+                        </td>
+
+                        {/* Devolver a Cola */}
+                        <td className="px-2 py-2 text-center align-top">
+                          {!isAbandoned && s.type === 'chat' ? (
+                            <button
+                              onClick={() => handleReopenSession(s)}
+                              className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-1 rounded-full transition-colors cursor-pointer whitespace-nowrap"
+                              title="Devolver esta conversación a la cola de espera"
+                            >
+                              <RotateCcw className="w-2.5 h-2.5" /> Devolver
+                            </button>
+                          ) : (
+                            <span className="text-gray-200 text-[10px]">—</span>
                           )}
                         </td>
                       </tr>

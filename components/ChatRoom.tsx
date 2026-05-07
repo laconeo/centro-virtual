@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../src/contexts/LanguageContext';
-import { Send, User, BadgeHelp, Download } from 'lucide-react';
+import { Send, User, BadgeHelp, Download, XCircle } from 'lucide-react';
 
 import { UserSession, Message } from '../types';
 import { supabaseService } from '../services/supabaseService';
@@ -11,9 +11,10 @@ interface ChatRoomProps {
     onExit?: () => void; // Para salir del chat (misioneros secundarios)
     onEndSession?: () => void; // Para finalizar la sesión (usuario o primer misionero)
     currentVolunteerId?: string; // ID del voluntario actual para determinar si es el primero
+    onSessionClosed?: () => void; // Callback when remote side closes the session
 }
 
-export const ChatRoom: React.FC<ChatRoomProps> = ({ session, currentUser, onExit, onEndSession, currentVolunteerId }) => {
+export const ChatRoom: React.FC<ChatRoomProps> = ({ session, currentUser, onExit, onEndSession, currentVolunteerId, onSessionClosed }) => {
     const { t } = useLanguage();
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputText, setInputText] = useState('');
@@ -22,6 +23,12 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ session, currentUser, onExit
     const inputRef = useRef<HTMLInputElement>(null);
     const messagesContainerRef = useRef<HTMLDivElement>(null);
     const lastTimestampRef = useRef<string | null>(null);
+
+    // --- Closed session state ---
+    const [isClosed, setIsClosed] = useState(session.estado === 'finalizado' || session.estado === 'abandonado');
+    const [closedByLabel, setClosedByLabel] = useState<string>('');
+    const onSessionClosedRef = useRef(onSessionClosed);
+    useEffect(() => { onSessionClosedRef.current = onSessionClosed; }, [onSessionClosed]);
 
     const fetchMessagesIncremental = async () => {
         const { data } = await supabaseService.getMessages(session.id, lastTimestampRef.current || undefined);
@@ -53,6 +60,32 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ session, currentUser, onExit
         const interval = setInterval(fetchMessagesIncremental, 2500); // 2.5 second poll (incremental)
         return () => clearInterval(interval);
     }, [session.id, currentUser]);
+
+    // Poll session status to detect remote closure
+    useEffect(() => {
+        if (isClosed) return; // Already closed, no need to poll
+        const interval = setInterval(async () => {
+            const { data } = await supabaseService.getSessionById(session.id);
+            if (data && (data.estado === 'finalizado' || data.estado === 'abandonado')) {
+                // Determine who closed it
+                let label = '';
+                if (currentUser === 'volunteer') {
+                    // Volunteer is viewing — the user must have closed it
+                    label = `El usuario ${data.nombre} ${data.apellido} ha cerrado el chat.`;
+                } else {
+                    // User is viewing — a volunteer closed it
+                    const volName = data.voluntario_nombre || 'El voluntario';
+                    label = `${volName} ha cerrado el chat.`;
+                }
+                setClosedByLabel(label);
+                setIsClosed(true);
+                // Notify parent after a short delay so the user can read the banner
+                setTimeout(() => { onSessionClosedRef.current?.(); }, 4000);
+            }
+        }, 3000);
+        return () => clearInterval(interval);
+    }, [session.id, currentUser, isClosed]);
+
 
     // Scroll to bottom on new messages
     useEffect(() => {
@@ -396,30 +429,48 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ session, currentUser, onExit
                     );
                 })}
                 <div ref={messagesEndRef} />
+
+                {/* Chat Closed Banner - shown at the bottom of the message list */}
+                {isClosed && closedByLabel && (
+                    <div className="flex justify-center my-3 animate-fade-in">
+                        <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-xl shadow-sm max-w-sm text-center">
+                            <XCircle className="w-4 h-4 flex-shrink-0" />
+                            <span className="text-xs font-medium">{closedByLabel}</span>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Input Area */}
             <form onSubmit={handleSendMessage} className="bg-white p-3 border-t border-[var(--color-fs-border)] flex gap-2 sticky bottom-0 z-10">
-                <input
-                    ref={inputRef}
-                    type="text"
-                    inputMode="text"
-                    enterKeyHint="send"
-                    autoComplete="off"
-                    autoCorrect="off"
-                    autoCapitalize="sentences"
-                    value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
-                    placeholder={t('chat_input_placeholder')}
-                    className="flex-1 border border-gray-300 rounded-full px-4 py-2 focus:outline-none focus:border-[var(--color-fs-blue)] text-base"
-                />
-                <button
-                    type="submit"
-                    disabled={!inputText.trim()}
-                    className="bg-[var(--color-fs-blue)] text-white p-2 rounded-full hover:bg-[var(--color-fs-blue-hover)] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors cursor-pointer"
-                >
-                    <Send className="w-5 h-5 ml-0.5" />
-                </button>
+                {isClosed ? (
+                    <div className="flex-1 flex items-center justify-center text-xs text-gray-400 italic py-1">
+                        <XCircle className="w-3.5 h-3.5 mr-1.5 text-red-300" /> El chat ha sido cerrado
+                    </div>
+                ) : (
+                    <>
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            inputMode="text"
+                            enterKeyHint="send"
+                            autoComplete="off"
+                            autoCorrect="off"
+                            autoCapitalize="sentences"
+                            value={inputText}
+                            onChange={(e) => setInputText(e.target.value)}
+                            placeholder={t('chat_input_placeholder')}
+                            className="flex-1 border border-gray-300 rounded-full px-4 py-2 focus:outline-none focus:border-[var(--color-fs-blue)] text-base"
+                        />
+                        <button
+                            type="submit"
+                            disabled={!inputText.trim()}
+                            className="bg-[var(--color-fs-blue)] text-white p-2 rounded-full hover:bg-[var(--color-fs-blue-hover)] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                        >
+                            <Send className="w-5 h-5 ml-0.5" />
+                        </button>
+                    </>
+                )}
             </form>
 
         </div>
