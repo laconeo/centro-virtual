@@ -5,10 +5,30 @@ const SUPABASE_URL = 'https://nbtfxxzkpgiddwimrwjx.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_kE9VBRPXLtK9hSYXrwKwWA_y5oRFj7e';
 
 // ── Helpers Supabase ─────────────────────────────────────────────────
-const H = { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` };
-const sbInsert = async (t, b) => { const r = await fetch(`${SUPABASE_URL}/rest/v1/${t}?select=*`, { method: 'POST', headers: { ...H, 'Prefer': 'return=representation' }, body: JSON.stringify(b) }); const d = await r.json(); return Array.isArray(d) ? d[0] : d; };
-const sbSelect = async (t, q = '') => (await fetch(`${SUPABASE_URL}/rest/v1/${t}?${q}`, { headers: H })).json();
-const sbPatch = async (t, id, b) => { const r = await fetch(`${SUPABASE_URL}/rest/v1/${t}?id=eq.${id}&select=*`, { method: 'PATCH', headers: { ...H, 'Prefer': 'return=representation' }, body: JSON.stringify(b) }); const d = await r.json(); return Array.isArray(d) ? d[0] : d; };
+// NOTA: Solo se usa 'apikey'. El token sb_publishable_* es opaco, NO un JWT.
+// Enviarlo como Bearer causaba fallos silenciosos en el gateway de Supabase.
+const H = { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY };
+
+// P1: Cada helper valida el HTTP status antes de parsear el body.
+const sbInsert = async (t, b) => {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${t}?select=*`, { method: 'POST', headers: { ...H, 'Prefer': 'return=representation' }, body: JSON.stringify(b) });
+  if (!r.ok) throw new Error(`sbInsert ${t} → HTTP ${r.status}`);
+  const d = await r.json();
+  return Array.isArray(d) ? d[0] : d;
+};
+
+const sbSelect = async (t, q = '') => {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${t}?${q}`, { headers: H });
+  if (!r.ok) throw new Error(`sbSelect ${t} → HTTP ${r.status}`);
+  return r.json();
+};
+
+const sbPatch = async (t, id, b) => {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${t}?id=eq.${id}&select=*`, { method: 'PATCH', headers: { ...H, 'Prefer': 'return=representation' }, body: JSON.stringify(b) });
+  if (!r.ok) throw new Error(`sbPatch ${t} → HTTP ${r.status}`);
+  const d = await r.json();
+  return Array.isArray(d) ? d[0] : d;
+};
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 // ── Persistencia ─────────────────────────────────────────────────────
@@ -45,7 +65,8 @@ let S = {
   view: 'form',
   rating: 0,
   lastMsgTimestamp: null,  // cursor: only fetch msgs NEWER than this
-  topicsCache: null        // cache topics so we don't refetch them
+  topicsCache: null,       // cache topics so we don't refetch them
+  pollErrorCount: 0        // P1: contador de fallos consecutivos de polling
 };
 let shadowRoot = null;
 
@@ -392,6 +413,7 @@ function buildWidget() {
     saveUserData(data);
     S.userData = data;
     S.lastMsgTimestamp = null; // reset cursor for new session
+    S.pollErrorCount = 0;      // reset error counter for new session
     $('fs-w-nombre').textContent = data.nombre;
     $('fs-w-tema').textContent = data.tema;
     showView('waiting');
@@ -399,10 +421,18 @@ function buildWidget() {
     try {
       S.session = await sbInsert('sessions', data);
       persistState();
-      // Poll session status every 5s (was 3s) — 1 req per 5s per user = 240 req/min for 20 users
+      // Poll session status every 5s — 1 req per 5s per user = 240 req/min for 20 users
       S.pollTimer = setInterval(pollStatus, 5000);
     } catch (err) {
+      // P2: Feedback visible si la sesión no pudo crearse en el servidor
+      console.error('[FS Widget] Error al crear sesión:', err);
       showView('form');
+      const errEl = $('fs-form-err');
+      if (errEl) {
+        errEl.textContent = 'No se pudo conectar con el servidor. Verifica tu conexión e intenta de nuevo.';
+        errEl.style.display = 'block';
+        setTimeout(() => { if ($('fs-form-err')) $('fs-form-err').style.display = 'none'; }, 5000);
+      }
       btn.disabled = false; btn.textContent = 'Entrar a la Sala de Espera';
     }
   };
@@ -415,6 +445,12 @@ function buildWidget() {
       // Only select status fields — no need for full record while waiting
       const rows = await sbSelect('sessions', `id=eq.${S.session.id}&select=id,estado,voluntario_id,volunteers(nombre)`);
       if (!rows?.length) return;
+
+      // Poll exitoso — resetear contador de errores y ocultar aviso si hubiera
+      S.pollErrorCount = 0;
+      const errBanner = $('fs-poll-err');
+      if (errBanner) errBanner.style.display = 'none';
+
       const s = rows[0];
       if (s.estado === 'en_atencion') {
         clearInterval(S.pollTimer);
@@ -426,13 +462,33 @@ function buildWidget() {
         persistState();
         showView('chat');
         await loadMsgs(); // Immediate first load
-        // Poll messages every 4s (was 2.5s) — still feels real-time, cuts req by 37%
+        // Poll messages every 4s — still feels real-time
         S.msgTimer = setInterval(loadMsgs, 4000);
       } else if (['finalizado', 'abandonado'].includes(s.estado)) {
         clearInterval(S.pollTimer);
         S.session = null; clearState(); showView('form');
       }
-    } catch (e) { }
+    } catch (e) {
+      // P1: Contar fallos consecutivos y mostrar aviso al usuario tras 3 intentos
+      S.pollErrorCount = (S.pollErrorCount || 0) + 1;
+      console.warn(`[FS Widget] Poll error #${S.pollErrorCount}:`, e.message);
+      if (S.pollErrorCount >= 3) {
+        let errBanner = $('fs-poll-err');
+        if (!errBanner) {
+          const waitCard = $('fs-view-waiting')?.querySelector('.fs-wait-card');
+          if (waitCard) {
+            errBanner = document.createElement('p');
+            errBanner.id = 'fs-poll-err';
+            errBanner.style.cssText = 'color:#c0392b;font-size:12px;margin-top:8px;text-align:center;';
+            waitCard.appendChild(errBanner);
+          }
+        }
+        if (errBanner) {
+          errBanner.textContent = '⚠️ Problemas de conexión. Verifica tu internet — seguimos intentando.';
+          errBanner.style.display = 'block';
+        }
+      }
+    }
   }
 
   $('fs-btn-cancel').onclick = async () => {

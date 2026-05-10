@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Usuario CV - FamilySearch",
-    "version": "1.3.1",
+    "version": "1.3.2",
     "description": "Asistencia en línea de FamilySearch: chatea con un voluntario mientras navegas.",
     "action": {
         "default_popup": "popup.html",

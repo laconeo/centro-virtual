@@ -1,11 +1,12 @@
 const SUPABASE_URL = 'https://nbtfxxzkpgiddwimrwjx.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_kE9VBRPXLtK9hSYXrwKwWA_y5oRFj7e';
 
+// NOTA: Se usa solo 'apikey' — el token sb_publishable_* es opaco, NO un JWT.
+// Enviarlo como Bearer causaba fallos silenciosos en el gateway de Supabase.
 const fetchOptions = {
     headers: {
         'Content-Type': 'application/json',
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`
+        'apikey': SUPABASE_KEY
     }
 };
 
