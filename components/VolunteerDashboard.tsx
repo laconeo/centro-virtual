@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import { useLanguage } from '../src/contexts/LanguageContext';
@@ -814,7 +814,7 @@ export const VolunteerDashboard: React.FC<DashboardProps> = ({ volunteer, onLogo
         <div className="mt-8 border-t border-gray-200 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
             <h3 className="text-lg font-semibold text-gray-600 flex items-center gap-2">
-              <CheckCircle className="w-5 h-5" /> {t('dashboard_history_title')}
+              <CheckCircle className="w-5 h-5" /> {t('dashboard_history_title')} ({historyFiltered.length})
             </h3>
             <div className="flex items-center gap-2 w-full md:w-auto">
               <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-2 py-1">

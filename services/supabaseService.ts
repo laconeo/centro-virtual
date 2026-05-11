@@ -138,31 +138,48 @@ class SupabaseService {
     }
 
     async getReportData(startDate?: string, endDate?: string) {
-        let query = supabase
-            .from('sessions')
-            .select('*')
-            .order('fecha_ingreso', { ascending: false });
+        let allData: any[] = [];
+        let hasMore = true;
+        let page = 0;
+        const pageSize = 1000;
 
-        if (startDate) {
-            // Convert local UTC-3 date to UTC start-of-day boundary
-            query = query.gte('fecha_ingreso', startDate + 'T03:00:00Z');
+        while (hasMore) {
+            let query = supabase
+                .from('sessions')
+                .select('*')
+                .order('fecha_ingreso', { ascending: false });
+
+            if (startDate) {
+                // Convert local UTC-3 date to UTC start-of-day boundary
+                query = query.gte('fecha_ingreso', startDate + 'T03:00:00Z');
+            }
+            if (endDate) {
+                // End of day in UTC-3 = next day T03:00:00Z in UTC
+                const [y, m, d] = endDate.split('-').map(Number);
+                const nextDay = new Date(Date.UTC(y, m - 1, d + 1));
+                const nextDayStr = nextDay.toISOString().split('T')[0];
+                query = query.lt('fecha_ingreso', nextDayStr + 'T03:00:00Z');
+            }
+
+            const { data, error } = await query.range(page * pageSize, (page + 1) * pageSize - 1);
+
+            if (error) {
+                console.error('Error fetching report data:', error);
+                return { data: allData.map(d => this.mapSession(d)), error };
+            }
+
+            if (data && data.length > 0) {
+                allData = [...allData, ...data];
+                page++;
+                if (data.length < pageSize) hasMore = false;
+            } else {
+                hasMore = false;
+            }
+
+            if (page > 30) break; // Safety limit (30,000 records max)
         }
-        if (endDate) {
-            // End of day in UTC-3 = next day T03:00:00Z in UTC
-            const nextDay = new Date(endDate);
-            nextDay.setDate(nextDay.getDate() + 1);
-            const nextDayStr = nextDay.toISOString().split('T')[0];
-            query = query.lt('fecha_ingreso', nextDayStr + 'T03:00:00Z');
-        }
 
-        const { data, error } = await query.limit(5000); // Bypass Supabase default 1000-row cap
-
-        if (error) {
-            console.error('Error fetching report data:', error);
-            return { data: [], error };
-        }
-
-        return { data: data.map(this.mapSession), error: null };
+        return { data: allData.map(d => this.mapSession(d)), error: null };
     }
 
     async getSessionsCount(startDate?: string, endDate?: string, status?: string) {
@@ -174,8 +191,8 @@ class SupabaseService {
             query = query.gte('fecha_ingreso', startDate + 'T03:00:00Z');
         }
         if (endDate) {
-            const nextDay = new Date(endDate);
-            nextDay.setDate(nextDay.getDate() + 1);
+            const [y, m, d] = endDate.split('-').map(Number);
+            const nextDay = new Date(Date.UTC(y, m - 1, d + 1));
             const nextDayStr = nextDay.toISOString().split('T')[0];
             query = query.lt('fecha_ingreso', nextDayStr + 'T03:00:00Z');
         }
@@ -578,13 +595,33 @@ class SupabaseService {
     }
 
     async getSurveys() {
-        const { data, error } = await supabase
-            .from('surveys')
-            .select('*');
+        let allData: any[] = [];
+        let hasMore = true;
+        let page = 0;
+        const pageSize = 1000;
 
-        if (error) return { data: [], error };
+        while (hasMore) {
+            const { data, error } = await supabase
+                .from('surveys')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .range(page * pageSize, (page + 1) * pageSize - 1);
+
+            if (error) return { data: allData, error };
+
+            if (data && data.length > 0) {
+                allData = [...allData, ...data];
+                page++;
+                if (data.length < pageSize) hasMore = false;
+            } else {
+                hasMore = false;
+            }
+
+            if (page > 30) break;
+        }
+
         return {
-            data: data.map(s => ({
+            data: allData.map(s => ({
                 id: s.id,
                 sesion_id: s.session_id,
                 calificacion: s.calificacion,
@@ -750,17 +787,7 @@ class SupabaseService {
         const loginsRes = await supabase.from('volunteer_logins').select('*').gte('date', startDate).lte('date', endDate).limit(5000);
         const logins = loginsRes.data || [];
 
-        // 3. Get Sessions to calculate attended (Need history sessions attended by them)
-        const sessionsRes = await supabase.from('sessions')
-            .select('volunteered_by:voluntario_id, fecha_ingreso')
-            .in('estado', ['finalizado'])
-            .gte('fecha_ingreso', startDate)
-            // Note: date logic here can be tricky due to timezones, but we'll approximate based on date prefix. 
-            // In a real app we might need exact boundaries. We'll add one day to end date to fetch all.
-            .lte('fecha_ingreso', endDate + 'T23:59:59Z')
-            .limit(5000); // Avoid default 1000 limit
-        
-        const attendedSessions = sessionsRes.data || [];
+        // 3. (Removed unused sessions fetch)
 
         // Build Indicators
         const indicators: Record<string, any> = {};
@@ -780,7 +807,10 @@ class SupabaseService {
         const end = new Date(eYear, eMonth - 1, eDay);
         
         for(let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-           const dateStr = d.toLocaleDateString('en-CA');
+           const yyyy = d.getFullYear();
+           const mm = String(d.getMonth() + 1).padStart(2, '0');
+           const dd = String(d.getDate()).padStart(2, '0');
+           const dateStr = `${yyyy}-${mm}-${dd}`;
            Object.values(indicators).forEach(ind => {
                ind.days[dateStr] = { hasShift: false, loggedIn: false, sessionsAttended: 0 };
            });
@@ -788,24 +818,20 @@ class SupabaseService {
 
         // Apply logic
         shifts.forEach(s => {
-            if (indicators[s.volunteer_id] && indicators[s.volunteer_id].days[s.date]) {
-                indicators[s.volunteer_id].days[s.date].hasShift = true;
+            const shiftDate = s.date ? s.date.split('T')[0] : '';
+            if (indicators[s.volunteer_id] && indicators[s.volunteer_id].days[shiftDate]) {
+                indicators[s.volunteer_id].days[shiftDate].hasShift = true;
             }
         });
 
         logins.forEach(l => {
-            if (indicators[l.volunteer_id] && indicators[l.volunteer_id].days[l.date]) {
-                indicators[l.volunteer_id].days[l.date].loggedIn = true;
+            const loginDate = l.date ? l.date.split('T')[0] : '';
+            if (indicators[l.volunteer_id] && indicators[l.volunteer_id].days[loginDate]) {
+                indicators[l.volunteer_id].days[loginDate].loggedIn = true;
             }
         });
 
-        attendedSessions.forEach(ses => {
-            const dateOnly = new Date(ses.fecha_ingreso).toLocaleDateString('en-CA');
-            const vId = ses.volunteered_by;
-            if (vId && indicators[vId] && indicators[vId].days[dateOnly]) {
-                 indicators[vId].days[dateOnly].sessionsAttended++;
-            }
-        });
+
 
         return indicators;
     }

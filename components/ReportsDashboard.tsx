@@ -41,7 +41,7 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ onClose }) =
     const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
     const [indicators, setIndicators] = useState<Record<string, VolunteerIndicator>>({});
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'general' | 'volunteers'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'volunteers' | 'consolidated'>('general');
     const [totalExactCount, setTotalExactCount] = useState(0);
     const [attendedExactCount, setAttendedExactCount] = useState(0);
 
@@ -61,32 +61,36 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ onClose }) =
 
     const fetchReportData = async () => {
         setLoading(true);
-        const sessionRes = await supabaseService.getReportData(startDate, endDate);
-        const surveyRes = await supabaseService.getSurveys();
-        const volRes = await supabaseService.getAllVolunteers();
+        try {
+            const sessionRes = await supabaseService.getReportData(startDate, endDate);
+            const surveyRes = await supabaseService.getSurveys();
+            const volRes = await supabaseService.getAllVolunteers();
 
-        // Fetch exact counts for KPIs to bypass array limits
-        const totalCountRes = await supabaseService.getSessionsCount(startDate, endDate);
-        const attendedCountRes = await supabaseService.getSessionsCount(startDate, endDate, 'finalizado');
+            // Fetch exact counts for KPIs to bypass array limits
+            const totalCountRes = await supabaseService.getSessionsCount(startDate, endDate);
+            const attendedCountRes = await supabaseService.getSessionsCount(startDate, endDate, 'finalizado');
 
-        if (totalCountRes.count !== undefined) setTotalExactCount(totalCountRes.count);
-        if (attendedCountRes.count !== undefined) setAttendedExactCount(attendedCountRes.count);
+            if (totalCountRes.count !== undefined) setTotalExactCount(totalCountRes.count);
+            if (attendedCountRes.count !== undefined) setAttendedExactCount(attendedCountRes.count);
 
-        if (sessionRes.data) setSessions(sessionRes.data as UserSession[]);
-        if (surveyRes.data && sessionRes.data) {
-            // Filter surveys that belong to the fetched sessions
-            const sessionIds = new Set(sessionRes.data.map(s => s.id));
-            const filteredSurveys = (surveyRes.data as SatisfactionSurvey[]).filter(s => sessionIds.has(s.sesion_id));
-            setSurveys(filteredSurveys);
+            if (sessionRes.data) setSessions(sessionRes.data as UserSession[]);
+            if (surveyRes.data && sessionRes.data) {
+                // Filter surveys that belong to the fetched sessions
+                const sessionIds = new Set(sessionRes.data.map(s => s.id));
+                const filteredSurveys = (surveyRes.data as SatisfactionSurvey[]).filter(s => sessionIds.has(s.sesion_id));
+                setSurveys(filteredSurveys);
+            }
+            
+            if (volRes.data) {
+                setVolunteers(volRes.data as Volunteer[]);
+                const metrics = await supabaseService.getVolunteerMetrics(startDate, endDate, volRes.data as Volunteer[]);
+                setIndicators(metrics);
+            }
+        } catch (error) {
+            console.error("Failed to load report data:", error);
+        } finally {
+            setLoading(false);
         }
-        
-        if (volRes.data) {
-            setVolunteers(volRes.data as Volunteer[]);
-            const metrics = await supabaseService.getVolunteerMetrics(startDate, endDate, volRes.data as Volunteer[]);
-            setIndicators(metrics);
-        }
-        
-        setLoading(false);
     };
 
     // --- CALCULATIONS ---
@@ -165,20 +169,38 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ onClose }) =
     // If 'Video' is selected, maybe show only Video bar? 
     // Let's stick to showing BOTH in the evolution chart always for comparison as requested "chat AND video during the month".
 
-    // Group by Date (using UTC-3 to avoid day-jump at midnight)
-    const dailyStats = sessions.reduce((acc, s) => {
-        const date = toUTC3DateStr(s.fecha_ingreso); // YYYY-MM-DD in UTC-3
-        if (!acc[date]) acc[date] = { video: 0, chat: 0 };
-        // Only count attended cases for this chart as per title
-        if (s.estado === 'finalizado') {
-            if (s.type === 'video') acc[date].video++;
-            if (s.type === 'chat') acc[date].chat++;
+    // Helper to generate a continuous date range
+    const generateDateRange = (start: string, end: string) => {
+        const dates: string[] = [];
+        let current = new Date(`${start}T00:00:00Z`);
+        const endD = new Date(`${end}T00:00:00Z`);
+        while (current <= endD) {
+            dates.push(current.toISOString().split('T')[0]);
+            current.setUTCDate(current.getUTCDate() + 1);
         }
+        return dates;
+    };
+
+    const allDays = generateDateRange(startDate, endDate);
+
+    // Group by Date (using UTC-3 to avoid day-jump at midnight)
+    const dailyStats = allDays.reduce((acc, d) => {
+        acc[d] = { video: 0, chat: 0 };
         return acc;
     }, {} as Record<string, { video: number, chat: number }>);
 
-    const sortedDates = Object.keys(dailyStats).sort();
-    const maxDailyCount = sortedDates.reduce((max, date) => Math.max(max, dailyStats[date].video + dailyStats[date].chat), 0); // Scale by max total or max individual? Max individual is better for side-by-side.
+    sessions.forEach(s => {
+        if (s.estado === 'finalizado') {
+            const date = toUTC3DateStr(s.fecha_ingreso);
+            if (dailyStats[date]) {
+                if (s.type === 'video') dailyStats[date].video++;
+                if (s.type === 'chat') dailyStats[date].chat++;
+            }
+        }
+    });
+
+    const sortedDates = allDays;
+    const maxDailyCount = sortedDates.reduce((max, date) => Math.max(max, dailyStats[date].video + dailyStats[date].chat), 0);
     const maxIndividualCount = sortedDates.reduce((max, date) => Math.max(max, dailyStats[date].video, dailyStats[date].chat), 0);
 
     // --- HOURLY ATTENTION DATA ---
@@ -342,6 +364,12 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ onClose }) =
                             >
                                 <Users className="w-4 h-4" /> Rendimiento de Voluntarios
                             </button>
+                            <button
+                                className={`px-5 py-3 text-sm border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'consolidated' ? 'border-[var(--color-fs-blue)] text-[var(--color-fs-blue)]' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+                                onClick={() => setActiveTab('consolidated')}
+                            >
+                                <BarChart2 className="w-4 h-4" /> Consolidado
+                            </button>
                         </div>
 
                         {activeTab === 'general' && (
@@ -487,38 +515,14 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ onClose }) =
                             </div>
                         </div>
 
-                        {/* - - - ROW 2: Channels (1/3) & Chart (2/3) - - - */}
+                        {/* - - - ROW 2: Chart (Full Width) - - - */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-                            {/* Channel Stats */}
-                            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-                                <h4 className="font-medium text-[var(--color-fs-text)] mb-6 border-b pb-2 border-gray-100">Canales de Atención</h4>
-                                <div className="flex items-center justify-around py-4">
-                                    <div className="text-center group">
-                                        <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3 text-[var(--color-fs-blue)] group-hover:bg-[var(--color-fs-blue)] group-hover:text-white transition-colors duration-300">
-                                            <Video className="w-8 h-8" />
-                                        </div>
-                                        <div className="text-3xl font-light text-[var(--color-fs-text)]">{byChannel['video'] || 0}</div>
-                                        <div className="text-xs text-[var(--color-fs-text-secondary)] font-bold uppercase tracking-wider mt-1">Video</div>
-                                    </div>
-                                    <div className="h-20 w-px bg-gray-200"></div>
-                                    <div className="text-center group">
-                                        <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3 text-[#8CB83E] group-hover:bg-[#8CB83E] group-hover:text-white transition-colors duration-300">
-                                            <MessageSquare className="w-8 h-8" />
-                                        </div>
-                                        <div className="text-3xl font-light text-[var(--color-fs-text)]">{byChannel['chat'] || 0}</div>
-                                        <div className="text-xs text-[var(--color-fs-text-secondary)] font-bold uppercase tracking-wider mt-1">Chat</div>
-                                    </div>
-                                </div>
-                            </div>
-
-
                             {/* Monthly Evolution Chart (Bar Chart) */}
-                            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 md:col-span-2">
+                            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 md:col-span-3">
                                 <h4 className="font-medium text-[var(--color-fs-text)] mb-6 flex items-center gap-2 border-b pb-2 border-gray-100">
                                     <Activity className="w-4 h-4 text-[var(--color-fs-blue)]" /> Evolución Diaria (Casos Atendidos)
                                 </h4>
-                                <div className="h-64 w-full flex flex-col">
+                                <div className="h-72 w-full flex flex-col mb-4">
                                     {sortedDates.length === 0 ? (
                                         <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
                                             No hay datos para el periodo seleccionado.
@@ -572,19 +576,14 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ onClose }) =
                                             </div>
 
                                             {/* X Axis Labels */}
-                                            <div className="flex justify-between mt-2 px-2 text-[10px] text-gray-400">
-                                                {sortedDates.map((date, i) => {
-                                                    // Show just a few labels
-                                                    const step = Math.ceil(sortedDates.length / 6);
-                                                    if (i % step === 0 || i === sortedDates.length - 1) {
-                                                        return <span key={date}>{new Date(date).toLocaleDateString(undefined, { day: '2-digit', month: '2-digit' })}</span>;
-                                                    }
-                                                    return <span key={date} className="w-4"></span>; // spacer
-                                                }).filter((_, i, arr) => {
-                                                    // Basic filtering to match the rendering logic above, or just rely on CSS
-                                                    const step = Math.ceil(sortedDates.length / 6);
-                                                    return i % step === 0 || i === sortedDates.length - 1;
-                                                })}
+                                            <div className="flex w-full mt-2 px-2 text-[9px] text-gray-400">
+                                                {sortedDates.map((date) => (
+                                                    <div key={date} className="flex-1 flex justify-center">
+                                                        <span className="-rotate-45 origin-top-left whitespace-nowrap mt-2 -ml-2">
+                                                            {new Date(date).toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: '2-digit' })}
+                                                        </span>
+                                                    </div>
+                                                ))}
                                             </div>
                                         </>
                                     )}
@@ -934,6 +933,335 @@ export const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ onClose }) =
                                 })()}
                             </div>
                         )}
+
+                        {activeTab === 'consolidated' && (() => {
+                            // --- CONSOLIDATED DATA ---
+                            const attendedOnly = filteredSessions.filter(s => s.estado === 'finalizado');
+
+                            // Unique volunteers who worked
+                            const activeVolIds = new Set(attendedOnly.map(s => s.voluntario_id).filter(Boolean));
+                            const activeVolCount = activeVolIds.size;
+
+                            // Per-missionary stats
+                            interface MissionaryStats {
+                                id: string;
+                                name: string;
+                                cases: number;
+                                avgTime: number;
+                                avgStars: number;
+                                starCount: number;
+                            }
+                            const missionaryMap: Record<string, MissionaryStats> = {};
+                            attendedOnly.forEach(s => {
+                                const vid = s.voluntario_id || 'unknown';
+                                const vol = volunteers.find(v => v.id === vid);
+                                const vname = vol ? vol.nombre : (s.voluntario_nombre || 'Desconocido');
+                                if (!missionaryMap[vid]) missionaryMap[vid] = { id: vid, name: vname, cases: 0, avgTime: 0, avgStars: 0, starCount: 0 };
+                                missionaryMap[vid].cases++;
+                                missionaryMap[vid].avgTime += s.duracion_conversacion_minutos || 0;
+                            });
+                            surveys.forEach(sv => {
+                                const sess = attendedOnly.find(s => s.id === sv.sesion_id);
+                                if (sess && sess.voluntario_id && missionaryMap[sess.voluntario_id]) {
+                                    missionaryMap[sess.voluntario_id].avgStars += sv.calificacion;
+                                    missionaryMap[sess.voluntario_id].starCount++;
+                                }
+                            });
+                            const missionaryList = Object.values(missionaryMap).map(m => ({
+                                ...m,
+                                avgTime: m.cases > 0 ? Math.round(m.avgTime / m.cases) : 0,
+                                avgStars: m.starCount > 0 ? parseFloat((m.avgStars / m.starCount).toFixed(1)) : 0
+                            })).sort((a, b) => b.cases - a.cases);
+                            const maxCasesC = Math.max(...missionaryList.map(m => m.cases), 1);
+
+                            // Daily evolution: volunteers active per day + cases
+                            const dailyConsolidated = allDays.reduce((acc, d) => {
+                                acc[d] = { cases: 0, vols: new Set<string>() };
+                                return acc;
+                            }, {} as Record<string, { cases: number; vols: Set<string> }>);
+
+                            attendedOnly.forEach(s => {
+                                const d = toUTC3DateStr(s.fecha_ingreso);
+                                if (dailyConsolidated[d]) {
+                                    dailyConsolidated[d].cases++;
+                                    if (s.voluntario_id) dailyConsolidated[d].vols.add(s.voluntario_id);
+                                }
+                            });
+                            const sortedDaysC = allDays;
+                            const maxCasesDay = Math.max(...sortedDaysC.map(d => dailyConsolidated[d].cases), 1);
+                            const maxVolsDay = Math.max(...sortedDaysC.map(d => dailyConsolidated[d].vols.size), 1);
+
+                            // Hourly evolution (all filtered)
+                            const hourlyC: number[] = Array(24).fill(0);
+                            const hourlyVolsC: Set<string>[] = Array.from({ length: 24 }, () => new Set());
+                            attendedOnly.forEach(s => { 
+                                const h = toUTC3Hour(s.fecha_ingreso);
+                                hourlyC[h]++; 
+                                if (s.voluntario_id) hourlyVolsC[h].add(s.voluntario_id);
+                            });
+                            const activeHoursC = hourlyC.map((_, i) => i).filter(i => hourlyC[i] > 0);
+                            const hourStartC = activeHoursC.length ? Math.max(0, activeHoursC[0] - 1) : 0;
+                            const hourEndC   = activeHoursC.length ? Math.min(23, activeHoursC[activeHoursC.length-1]+1) : 23;
+                            const visibleHoursC = Array.from({ length: hourEndC - hourStartC + 1 }, (_, i) => i + hourStartC);
+                            const maxHourlyC = Math.max(...visibleHoursC.map(h => hourlyC[h]), 1);
+
+                            // Per-missionary hourly: top 5 by cases
+                            const top5 = missionaryList.slice(0, 5);
+                            const colors = ['#005994','#8CB83E','#f59e0b','#8b5cf6','#ef4444'];
+
+                            const missionaryHourly: Record<string, number[]> = {};
+                            top5.forEach(m => { missionaryHourly[m.id] = Array(24).fill(0); });
+                            attendedOnly.forEach(s => {
+                                if (s.voluntario_id && missionaryHourly[s.voluntario_id]) {
+                                    missionaryHourly[s.voluntario_id][toUTC3Hour(s.fecha_ingreso)]++;
+                                }
+                            });
+                            const maxMissionaryHourly = Math.max(
+                                ...top5.flatMap(m => visibleHoursC.map(h => missionaryHourly[m.id][h])), 1
+                            );
+
+                            return (
+                                <div className="space-y-6 animate-fade-in">
+                                    {/* KPI Cards */}
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        <div className="bg-white p-5 rounded-lg shadow-sm border-l-4 border-[var(--color-fs-blue)]">
+                                            <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Misioneros Activos</p>
+                                            <p className="text-3xl font-light text-gray-800">{activeVolCount}</p>
+                                            <p className="text-xs text-gray-400 mt-1">en el período</p>
+                                        </div>
+                                        <div className="bg-white p-5 rounded-lg shadow-sm border-l-4 border-[var(--color-fs-tree)]">
+                                            <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Casos Atendidos</p>
+                                            <p className="text-3xl font-light text-gray-800">{attendedOnly.length}</p>
+                                            <p className="text-xs text-gray-400 mt-1">sesiones finalizadas</p>
+                                        </div>
+                                        <div className="bg-white p-5 rounded-lg shadow-sm border-l-4 border-amber-400">
+                                            <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Tiempo Prom. Atención</p>
+                                            <p className="text-3xl font-light text-gray-800">
+                                                {missionaryList.length > 0
+                                                    ? Math.round(missionaryList.reduce((a,m)=>a+m.avgTime*m.cases,0)/Math.max(attendedOnly.length,1))
+                                                    : 0}m
+                                            </p>
+                                            <p className="text-xs text-gray-400 mt-1">promedio global</p>
+                                        </div>
+                                        <div className="bg-white p-5 rounded-lg shadow-sm border-l-4 border-yellow-400">
+                                            <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-1">Estrellas Promedio</p>
+                                            <p className="text-3xl font-light text-gray-800 flex items-center gap-1">
+                                                {surveys.length > 0 ? (surveys.reduce((a,s)=>a+s.calificacion,0)/surveys.length).toFixed(1) : 'N/A'}
+                                                <Star className="w-5 h-5 text-yellow-400 fill-current" />
+                                            </p>
+                                            <p className="text-xs text-gray-400 mt-1">{surveys.length} encuestas</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Daily Evolution */}
+                                    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                                        <h4 className="font-medium text-gray-800 mb-4 flex items-center gap-2 border-b pb-2 border-gray-100">
+                                            <Activity className="w-4 h-4 text-[var(--color-fs-blue)]" /> Evolución Diaria de Casos y Misioneros
+                                        </h4>
+                                        {sortedDaysC.length === 0 ? (
+                                            <div className="h-40 flex items-center justify-center text-gray-400 text-sm">No hay datos para el periodo.</div>
+                                        ) : (
+                                            <div className="h-64 flex flex-col mb-4">
+                                                <div className="flex-1 flex items-end gap-1 border-b border-gray-100 pb-1 pt-6 relative">
+                                                    {sortedDaysC.map(d => {
+                                                        const barH = (dailyConsolidated[d].cases / maxCasesDay) * 100;
+                                                        const volH = (dailyConsolidated[d].vols.size / maxVolsDay) * 100;
+                                                        return (
+                                                            <div key={d} className="flex-1 flex flex-col justify-end items-center group relative h-full min-w-[10px]">
+                                                                <div className="opacity-0 group-hover:opacity-100 absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] px-3 py-2 rounded shadow-lg whitespace-nowrap z-30 pointer-events-none text-center">
+                                                                    <div className="font-bold border-b border-gray-600 mb-1 pb-1">{new Date(d).toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short' })}</div>
+                                                                    <div className="text-[var(--color-fs-blue)] font-bold">{dailyConsolidated[d].cases} casos en total</div>
+                                                                    <div className="text-amber-400 font-bold">{dailyConsolidated[d].vols.size} misioneros activos</div>
+                                                                    <div className="text-gray-300 mt-1 pt-1 border-t border-gray-600 font-medium">Promedio: {dailyConsolidated[d].vols.size > 0 ? (dailyConsolidated[d].cases / dailyConsolidated[d].vols.size).toFixed(1) : 0} casos/mis</div>
+                                                                </div>
+                                                                
+                                                                {/* Voluntarios Badge */}
+                                                                {dailyConsolidated[d].vols.size > 0 && (
+                                                                    <div 
+                                                                        className="absolute left-1/2 -translate-x-1/2 w-4 h-4 bg-amber-500 text-white rounded-full flex items-center justify-center text-[8px] font-bold shadow-sm z-20 pointer-events-none border border-white"
+                                                                        style={{ bottom: `${Math.min(volH, 100)}%`, marginBottom: '-8px' }}
+                                                                    >
+                                                                        {dailyConsolidated[d].vols.size}
+                                                                    </div>
+                                                                )}
+
+                                                                <div className="w-full rounded-t-sm bg-[var(--color-fs-blue)] hover:opacity-80 transition-all z-10"
+                                                                    style={{ height: `${Math.max(barH, 2)}%` }} />
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                                <div className="flex w-full mt-2 text-[9px] text-gray-400 px-1">
+                                                    {sortedDaysC.map(d => (
+                                                        <div key={d} className="flex-1 flex justify-center">
+                                                            <span className="-rotate-45 origin-top-right whitespace-nowrap mt-3 mr-2">
+                                                                {new Date(d).toLocaleDateString(undefined, { weekday: 'short', day:'2-digit', month:'2-digit' })}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Hourly Evolution */}
+                                    <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                                        <h4 className="font-medium text-gray-800 mb-4 flex items-center gap-2 border-b pb-2 border-gray-100">
+                                            <Clock className="w-4 h-4 text-[var(--color-fs-blue)]" /> Distribución Horaria de Casos
+                                        </h4>
+                                        {activeHoursC.length === 0 ? (
+                                            <div className="h-40 flex items-center justify-center text-gray-400 text-sm">No hay datos.</div>
+                                        ) : (
+                                            <div className="h-48 flex gap-2">
+                                                <div className="flex flex-col justify-between text-right pr-1 w-6 flex-shrink-0 pb-6">
+                                                    {[1,.75,.5,.25,0].map(t => <span key={t} className="text-[9px] text-gray-400">{Math.round(maxHourlyC*t)}</span>)}
+                                                </div>
+                                                <div className="flex-1 flex flex-col">
+                                                    <div className="flex-1 flex items-end gap-[3px] border-b border-l border-gray-200 pt-6">
+                                                        {visibleHoursC.map(h => {
+                                                            const maxVolsH = Math.max(...visibleHoursC.map(hour => hourlyVolsC[hour].size), 1);
+                                                            const volH = (hourlyVolsC[h].size / maxVolsH) * 100;
+                                                            const barH = Math.max((hourlyC[h]/maxHourlyC)*100, hourlyC[h]>0?2:0);
+                                                            return (
+                                                                <div key={h} className="flex-1 flex flex-col justify-end items-center group relative h-full min-w-[10px]">
+                                                                    {hourlyC[h] > 0 && (
+                                                                        <div className="opacity-0 group-hover:opacity-100 absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] px-3 py-2 rounded shadow-lg whitespace-nowrap z-30 pointer-events-none text-center">
+                                                                            <div className="font-bold border-b border-gray-600 mb-1 pb-1">{h}:00–{h+1}:00</div>
+                                                                            <div className="text-[var(--color-fs-blue)] font-bold">{hourlyC[h]} casos</div>
+                                                                            <div className="text-amber-400 mt-0.5">{hourlyVolsC[h].size} misioneros conectados</div>
+                                                                        </div>
+                                                                    )}
+                                                                    
+                                                                    {/* Voluntarios Badge */}
+                                                                    {hourlyVolsC[h].size > 0 && (
+                                                                        <div 
+                                                                            className="absolute left-1/2 -translate-x-1/2 w-4 h-4 md:w-5 md:h-5 bg-amber-500 text-white rounded-full flex items-center justify-center text-[8px] md:text-[9px] font-bold shadow-sm z-20 pointer-events-none border border-white"
+                                                                            style={{ bottom: `${Math.min(volH, 100)}%`, marginBottom: '-8px' }}
+                                                                        >
+                                                                            {hourlyVolsC[h].size}
+                                                                        </div>
+                                                                    )}
+
+                                                                    <div className="w-full rounded-t-sm bg-[var(--color-fs-blue)] hover:opacity-80 transition-all"
+                                                                        style={{ height: `${barH}%` }} />
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                    <div className="flex gap-[3px] mt-1">
+                                                        {visibleHoursC.map((h,i) => (
+                                                            <div key={h} className="flex-1 text-center min-w-[10px]">
+                                                                {(visibleHoursC.length <= 14 || i===0 || i===visibleHoursC.length-1 || h%2===0) && (
+                                                                    <span className="text-[9px] text-gray-400">{h}h</span>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Per-Missionary Hourly (Top 5) */}
+                                    {top5.length > 0 && (
+                                        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                                            <h4 className="font-medium text-gray-800 mb-4 flex items-center gap-2 border-b pb-2 border-gray-100">
+                                                <Users className="w-4 h-4 text-[var(--color-fs-blue)]" /> Distribución Horaria por Misionero (Top 5)
+                                            </h4>
+                                            <div className="flex flex-col gap-3">
+                                                {top5.map((m, mi) => {
+                                                    const maxM = Math.max(...visibleHoursC.map(h => missionaryHourly[m.id][h]), 1);
+                                                    return (
+                                                        <div key={m.id} className="flex items-center gap-3">
+                                                            <div className="w-36 text-xs font-medium truncate" style={{color: colors[mi]}} title={m.name}>{m.name}</div>
+                                                            <div className="flex-1 flex items-end gap-[2px] h-8">
+                                                                {visibleHoursC.map(h => (
+                                                                    <div key={h} className="flex-1 rounded-t-sm transition-all hover:opacity-70 min-w-[4px]"
+                                                                        style={{ height: `${Math.max((missionaryHourly[m.id][h]/maxM)*100, missionaryHourly[m.id][h]>0?8:0)}%`, backgroundColor: colors[mi] }}
+                                                                        title={`${m.name} ${h}:00 · ${missionaryHourly[m.id][h]} casos`} />
+                                                                ))}
+                                                            </div>
+                                                            <div className="text-xs text-gray-400 w-16 text-right">{m.cases} casos</div>
+                                                        </div>
+                                                    );
+                                                })}
+                                                <div className="flex items-center gap-3 mt-1">
+                                                    <div className="w-36" />
+                                                    <div className="flex-1 flex gap-[2px]">
+                                                        {visibleHoursC.filter((_,i)=>visibleHoursC.length<=14||i===0||i===visibleHoursC.length-1||visibleHoursC[i]%2===0).map(h=>(
+                                                            <span key={h} className="flex-1 text-center text-[9px] text-gray-400 min-w-[4px]">{h}h</span>
+                                                        ))}
+                                                    </div>
+                                                    <div className="w-16" />
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-wrap gap-4 mt-4">
+                                                {top5.map((m,mi)=>(
+                                                    <div key={m.id} className="flex items-center gap-1 text-xs text-gray-500">
+                                                        <span className="w-3 h-3 rounded-sm" style={{backgroundColor:colors[mi]}} />{m.name}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Ranking Table */}
+                                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                                        <div className="p-5 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                                            <h4 className="font-medium text-gray-800 flex items-center gap-2">
+                                                <Star className="w-4 h-4 text-yellow-400" /> Ranking de Misioneros
+                                            </h4>
+                                            <span className="text-xs text-gray-400">{missionaryList.length} misioneros activos</span>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-sm text-left whitespace-nowrap">
+                                                <thead className="bg-[#f0f4f8] text-[10px] font-bold uppercase text-gray-500">
+                                                    <tr>
+                                                        <th className="px-4 py-3">#</th>
+                                                        <th className="px-4 py-3">Misionero</th>
+                                                        <th className="px-4 py-3 text-center">Casos</th>
+                                                        <th className="px-4 py-3 text-center">Barra</th>
+                                                        <th className="px-4 py-3 text-center">T. Prom. (min)</th>
+                                                        <th className="px-4 py-3 text-center">⭐ Estrellas</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-100">
+                                                    {missionaryList.length === 0 ? (
+                                                        <tr><td colSpan={6} className="px-6 py-8 text-center text-gray-400 italic">Sin actividad en este período.</td></tr>
+                                                    ) : missionaryList.map((m, idx) => (
+                                                        <tr key={m.id} className="hover:bg-gray-50 transition-colors">
+                                                            <td className="px-4 py-3">
+                                                                <span className={`font-bold text-sm ${idx===0?'text-yellow-500':idx===1?'text-gray-400':idx===2?'text-amber-600':'text-gray-400'}`}>
+                                                                    {idx===0?'🥇':idx===1?'🥈':idx===2?'🥉':`#${idx+1}`}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-4 py-3 font-medium text-gray-800">{m.name}</td>
+                                                            <td className="px-4 py-3 text-center">
+                                                                <span className="inline-flex items-center justify-center min-w-[28px] rounded-full bg-blue-50 text-[var(--color-fs-blue)] font-bold px-2 py-0.5 text-xs">{m.cases}</span>
+                                                            </td>
+                                                            <td className="px-4 py-3 w-40">
+                                                                <div className="w-full bg-gray-100 rounded-sm h-2 overflow-hidden">
+                                                                    <div className="h-full rounded-sm bg-[var(--color-fs-blue)]" style={{width:`${(m.cases/maxCasesC)*100}%`, minWidth:'4px'}} />
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-4 py-3 text-center text-gray-700 font-medium">{m.avgTime > 0 ? `${m.avgTime} min` : '—'}</td>
+                                                            <td className="px-4 py-3 text-center">
+                                                                {m.starCount > 0 ? (
+                                                                    <span className="inline-flex items-center gap-1 font-bold text-yellow-500">
+                                                                        {m.avgStars} <Star className="w-3.5 h-3.5 fill-current" />
+                                                                        <span className="text-[10px] text-gray-400 font-normal">({m.starCount})</span>
+                                                                    </span>
+                                                                ) : <span className="text-gray-300 text-xs">Sin datos</span>}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
                     </div>
                 )}
             </div>
