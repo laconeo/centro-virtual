@@ -10,6 +10,7 @@ import { Layout } from './components/ui/Layout';
 import { supabaseService } from './services/supabaseService';
 import { UserLandingExtension } from './components/UserLandingExtension';
 import { ExtensionsDashboard } from './components/ExtensionsDashboard';
+import { ClosedProjectModal } from './components/ClosedProjectModal';
 
 type ViewState = 'home' | 'user-flow' | 'volunteer-login' | 'volunteer-dashboard' | 'config' | 'extension-landing' | 'extensions-dashboard';
 
@@ -84,66 +85,58 @@ function App() {
   };
 
   // Render Views
-  if (view === 'volunteer-login') {
-    // Detect if we are in recovery mode via hash or session
-    const isRecovery = window.location.hash.includes('type=recovery');
-    return (
-      <>
+  const renderContent = () => {
+    if (view === 'volunteer-login') {
+      // Detect if we are in recovery mode via hash or session
+      const isRecovery = window.location.hash.includes('type=recovery');
+      return (
         <VolunteerLogin
           onLoginSuccess={handleVolunteerLogin}
           onBack={goHome}
           initialView={isRecovery ? 'reset' : 'login'}
         />
-        <Toaster position="top-right" />
-      </>
-    );
-  }
+      );
+    }
 
-  if (view === 'volunteer-dashboard' && currentVolunteer) {
-    return (
-      <>
+    if (view === 'volunteer-dashboard' && currentVolunteer) {
+      return (
         <VolunteerDashboard
           volunteer={currentVolunteer}
           onLogout={handleVolunteerLogout}
           onConfigClick={handleOpenConfig}
         />
-        <Toaster position="top-right" />
-      </>
-    );
-  }
+      );
+    }
 
-  if (view === 'config') {
-    return (
-      <>
+    if (view === 'config') {
+      return (
         <ConfigDashboard onBack={currentVolunteer ? () => setView('volunteer-dashboard') : goHome} />
-        <Toaster position="top-right" />
-      </>
-    );
-  }
+      );
+    }
 
-  if (view === 'extension-landing') {
-    return (
-      <>
+    if (view === 'extension-landing') {
+      return (
         <UserLandingExtension />
-        <Toaster position="top-right" />
-      </>
-    );
-  }
+      );
+    }
 
-  if (view === 'extensions-dashboard') {
-    return (
-      <>
+    if (view === 'extensions-dashboard') {
+      return (
         <ExtensionsDashboard />
-        <Toaster position="top-right" />
-      </>
-    );
-  }
+      );
+    }
 
-  // Home Screen (Now UserFlow)
+    // Home Screen (Now UserFlow)
+    return (
+      <UserFlow key={userFlowKey} onExit={goHome} onVolunteerAccess={startVolunteerFlow} />
+    );
+  };
+
   return (
     <>
-      <UserFlow key={userFlowKey} onExit={goHome} onVolunteerAccess={startVolunteerFlow} />
+      {renderContent()}
       <Toaster position="top-right" />
+      <ClosedProjectModal />
     </>
   );
 }
