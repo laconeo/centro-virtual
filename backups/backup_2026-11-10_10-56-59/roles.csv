@@ -1,0 +1,5 @@
+id,name,description,is_leader,created_at
+85ea8c87-cc9a-4400-93e1-ed75ca2c2600,Voluntario,Voluntario estándar para atención de usuarios.,false,2026-01-17T14:57:00.868232+00:00
+864de8a8-fe2e-4b16-9702-7edeb8a5fcf8,Administrador,Acceso completo a la configuración.,true,2026-01-17T14:57:00.868232+00:00
+10f4a12a-5a77-42a0-a94a-880797113cc8,lider de grupo,,true,2026-04-27T15:52:05.410678+00:00
+d2ff7e86-319c-45be-90ba-5d0d4c2cf42e,Líder de Turno,elder maldonado,true,2026-01-17T14:57:00.868232+00:00

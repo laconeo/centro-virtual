@@ -1,0 +1,29 @@
+{
+  "roles": {
+    "error": "fetch failed"
+  },
+  "volunteers": {
+    "error": "fetch failed"
+  },
+  "sessions": {
+    "error": "fetch failed"
+  },
+  "messages": {
+    "error": "fetch failed"
+  },
+  "shifts": {
+    "error": "fetch failed"
+  },
+  "topics": {
+    "error": "fetch failed"
+  },
+  "surveys": {
+    "error": "fetch failed"
+  },
+  "volunteer_logins": {
+    "error": "fetch failed"
+  },
+  "extension_installs": {
+    "error": "fetch failed"
+  }
+}
